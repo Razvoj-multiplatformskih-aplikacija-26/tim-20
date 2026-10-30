@@ -14,6 +14,7 @@ final class MyTicketsBloc extends Bloc<MyTicketsEvent, MyTicketsState> {
     required this.payTicket,
     required this.cancelTicket,
     required this.visitor,
+    required this.clock,
   }) : super(const MyTicketsLoading()) {
     on<MyTicketsRequested>((event, emit) async {
       emit(const MyTicketsLoading());
@@ -21,7 +22,7 @@ final class MyTicketsBloc extends Bloc<MyTicketsEvent, MyTicketsState> {
     });
     on<MyTicketsFilterChanged>((event, emit) {
       final current = state;
-      if (current is MyTicketsLoaded) emit(current.copyWith(filter: event.filter));
+      if (current is MyTicketsLoaded) emit(current.withFilter(event.filter));
     });
     on<TicketPaymentRequested>(
       (event, emit) => _act(event.id, emit, () => payTicket(id: event.id, by: visitor), TicketPaid.new),
@@ -31,7 +32,7 @@ final class MyTicketsBloc extends Bloc<MyTicketsEvent, MyTicketsState> {
     );
     on<MyTicketsNoticeAcknowledged>((event, emit) {
       final current = state;
-      if (current is MyTicketsLoaded && current.notice != null) emit(current.copyWith(notice: null));
+      if (current is MyTicketsLoaded && current.notice != null) emit(current.withNotice(null));
     });
   }
 
@@ -39,6 +40,13 @@ final class MyTicketsBloc extends Bloc<MyTicketsEvent, MyTicketsState> {
   final PayTicket payTicket;
   final CancelTicket cancelTicket;
   final User visitor;
+  final Clock clock;
+
+  /// The filter may change while an action runs, so the result is built on the latest state.
+  MyTicketsLoaded _latest(MyTicketsLoaded fallback) {
+    final current = state;
+    return current is MyTicketsLoaded ? current : fallback;
+  }
 
   /// One action at a time: while a ticket is in flight, other actions are ignored.
   Future<void> _act(
@@ -49,19 +57,19 @@ final class MyTicketsBloc extends Bloc<MyTicketsEvent, MyTicketsState> {
   ) async {
     final current = state;
     if (current is! MyTicketsLoaded || current.isBusy) return;
-    emit(current.copyWith(inFlightId: id));
+    emit(current.withInFlight(id));
     final Result<Ticket> result;
     try {
       result = await action();
     } on Exception catch (cause) {
-      emit(current.copyWith(notice: TicketActionFailed(cause)));
+      emit(_latest(current).withNotice(TicketActionFailed(cause)));
       return;
     }
     switch (result) {
       case Success(:final value):
-        await _reload(emit, filter: current.filter, notice: succeeded(value));
+        await _reload(emit, filter: _latest(current).filter, notice: succeeded(value));
       case Failure(:final error):
-        emit(current.copyWith(notice: TicketActionRejected(error)));
+        emit(_latest(current).withNotice(TicketActionRejected(error)));
     }
   }
 
@@ -71,9 +79,12 @@ final class MyTicketsBloc extends Bloc<MyTicketsEvent, MyTicketsState> {
     MyTicketsNotice? notice,
   }) async {
     try {
+      final loadedAt = clock.now();
       final tickets = await getMyTickets(visitor);
       emit(
-        tickets.isEmpty ? const MyTicketsEmpty() : MyTicketsLoaded(tickets: tickets, filter: filter, notice: notice),
+        tickets.isEmpty
+            ? const MyTicketsEmpty()
+            : MyTicketsLoaded(tickets: tickets, loadedAt: loadedAt, filter: filter, notice: notice),
       );
     } on Exception catch (cause) {
       emit(MyTicketsFailure(cause));

@@ -32,15 +32,24 @@ final class MyTicketsEmpty extends MyTicketsState {
 }
 
 final class MyTicketsLoaded extends MyTicketsState {
-  const MyTicketsLoaded({required this.tickets, this.filter = StatusFilter.all, this.inFlightId, this.notice});
+  const MyTicketsLoaded({
+    required this.tickets,
+    required this.loadedAt,
+    this.filter = StatusFilter.all,
+    this.inFlightId,
+    this.notice,
+  });
 
   final List<OwnedTicket> tickets;
+
+  /// The moment [tickets] and their actions were read; screens judge the tickets at this time.
+  final DateTime loadedAt;
   final StatusFilter filter;
   final TicketId? inFlightId;
   final MyTicketsNotice? notice;
 
   @override
-  List<Object?> get props => [tickets, filter, inFlightId, notice];
+  List<Object?> get props => [tickets, loadedAt, filter, inFlightId, notice];
 
   @override
   String toString() => [
@@ -64,9 +73,15 @@ final class MyTicketsLoaded extends MyTicketsState {
 
   bool get isBusy => inFlightId != null;
 
-  /// [inFlightId] and [notice] are cleared unless given, since both last for one step only.
-  MyTicketsLoaded copyWith({StatusFilter? filter, TicketId? inFlightId, MyTicketsNotice? notice}) =>
-      MyTicketsLoaded(tickets: tickets, filter: filter ?? this.filter, inFlightId: inFlightId, notice: notice);
+  MyTicketsLoaded withFilter(StatusFilter filter) =>
+      MyTicketsLoaded(tickets: tickets, loadedAt: loadedAt, filter: filter, inFlightId: inFlightId, notice: notice);
+
+  MyTicketsLoaded withInFlight(TicketId id) =>
+      MyTicketsLoaded(tickets: tickets, loadedAt: loadedAt, filter: filter, inFlightId: id);
+
+  /// An action has finished, so nothing is in flight any more.
+  MyTicketsLoaded withNotice(MyTicketsNotice? notice) =>
+      MyTicketsLoaded(tickets: tickets, loadedAt: loadedAt, filter: filter, notice: notice);
 }
 
 sealed class MyTicketsNotice extends Equatable {

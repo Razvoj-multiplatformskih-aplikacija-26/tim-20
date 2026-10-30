@@ -23,6 +23,7 @@ void main() {
     payTicket: PayTicket(tickets: store, clock: clock),
     cancelTicket: CancelTicket(events: store, tickets: store, clock: clock),
     visitor: ana,
+    clock: clock,
   );
 
   FakeTicketing store() => FakeTicketing(events: [nextWeek, tomorrow], tickets: [reserved, paid, paidTomorrow]);
@@ -133,6 +134,37 @@ void main() {
           .having((s) => s.notice, 'notice', isA<TicketPaid>())
           .having((s) => s.byId(const TicketId('t-2'))?.ticket.status, 'status', Paid(paidAt: now)),
     ],
+  );
+
+  blocTest<MyTicketsBloc, MyTicketsState>(
+    'a filter change while an action is in flight keeps the busy guard and the new filter',
+    build: () => build(store()),
+    act: (bloc) async {
+      await load(bloc);
+      bloc
+        ..add(const TicketPaymentRequested(TicketId('t-1')))
+        ..add(const MyTicketsFilterChanged(StatusFilter.paid));
+    },
+    skip: 2,
+    expect: () => [
+      isA<MyTicketsLoaded>().having((s) => s.inFlightId, 'inFlight', const TicketId('t-1')),
+      isA<MyTicketsLoaded>()
+          .having((s) => s.inFlightId, 'inFlight', const TicketId('t-1'))
+          .having((s) => s.filter, 'filter', StatusFilter.paid)
+          .having((s) => s.isBusy, 'busy', isTrue),
+      isA<MyTicketsLoaded>()
+          .having((s) => s.filter, 'filter', StatusFilter.paid)
+          .having((s) => s.notice, 'notice', isA<TicketPaid>())
+          .having((s) => s.inFlightId, 'inFlight', isNull),
+    ],
+  );
+
+  blocTest<MyTicketsBloc, MyTicketsState>(
+    'the loaded state remembers when the tickets were read',
+    build: () => build(store()),
+    act: (bloc) => bloc.add(const MyTicketsRequested()),
+    skip: 1,
+    expect: () => [isA<MyTicketsLoaded>().having((s) => s.loadedAt, 'loadedAt', now)],
   );
 
   blocTest<MyTicketsBloc, MyTicketsState>(
