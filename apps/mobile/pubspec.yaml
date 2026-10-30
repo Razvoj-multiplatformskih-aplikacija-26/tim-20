@@ -1,0 +1,28 @@
+name: mobile
+description: Mobile app for visitors with events, tickets with a QR code, payment and cancellation.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.0
+resolution: workspace
+
+dependencies:
+  blocs:
+    path: ../../packages/blocs
+  domain:
+    path: ../../packages/domain
+  flutter:
+    sdk: flutter
+  ui:
+    path: ../../packages/ui
+  use_cases:
+    path: ../../packages/use_cases
+
+dev_dependencies:
+  flutter_lints: 6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
