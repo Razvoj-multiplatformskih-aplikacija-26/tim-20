@@ -14,7 +14,15 @@ final class GetPurchaseContext {
 
   /// Null for an unknown event.
   Future<PurchaseContext?> call({required EventId eventId, required UserId holder}) async {
-    // D2
-    throw UnimplementedError();
+    final event = await events.findEvent(eventId);
+    if (event == null) return null;
+
+    final now = clock.now();
+    final ticketsOfEvent = await tickets.ticketsFor(eventId);
+    return PurchaseContext(
+      event: event,
+      remaining: remainingSeats(event, ticketsOfEvent, now: now),
+      alreadyHeld: heldBy(holder, eventId, ticketsOfEvent, now: now),
+    );
   }
 }

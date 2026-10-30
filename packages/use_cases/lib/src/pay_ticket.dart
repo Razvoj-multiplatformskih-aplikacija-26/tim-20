@@ -10,7 +10,12 @@ final class PayTicket {
   final Clock clock;
 
   Future<Result<Ticket>> call({required TicketId id, required User by}) async {
-    // D2
-    throw UnimplementedError();
+    final ticket = await tickets.findTicket(id);
+    if (ticket == null) return const Failure(NotFound());
+
+    return switch (payTicket(ticket, by: by, now: clock.now())) {
+      Success(:final value) => Success((await tickets.saveAll([value])).single),
+      Failure(:final error) => Failure(error),
+    };
   }
 }

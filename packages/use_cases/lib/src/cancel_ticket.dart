@@ -12,7 +12,14 @@ final class CancelTicket {
   final Clock clock;
 
   Future<Result<Ticket>> call({required TicketId id, required User by, String reason = ''}) async {
-    // D2
-    throw UnimplementedError();
+    final ticket = await tickets.findTicket(id);
+    if (ticket == null) return const Failure(NotFound());
+    final event = await events.findEvent(ticket.eventId);
+    if (event == null) return const Failure(NotFound());
+
+    return switch (cancelTicket(ticket, event, by: by, now: clock.now(), reason: reason)) {
+      Success(:final value) => Success((await tickets.saveAll([value])).single),
+      Failure(:final error) => Failure(error),
+    };
   }
 }

@@ -14,7 +14,19 @@ final class GetMyTickets {
 
   /// Tickets of [visitor] sorted by the start of their event, past events included.
   Future<List<OwnedTicket>> call(User visitor) async {
-    // D2
-    throw UnimplementedError();
+    final now = clock.now();
+    final owned = <OwnedTicket>[];
+    for (final ticket in await tickets.ticketsOf(visitor.id)) {
+      final event = await events.findEvent(ticket.eventId);
+      if (event == null) continue;
+      owned.add(
+        OwnedTicket(
+          ticket: ticket.copyWith(status: effectiveStatus(ticket, now: now)),
+          event: event,
+          actions: visitorActionsFor(ticket, event, by: visitor, now: now),
+        ),
+      );
+    }
+    return owned..sort((a, b) => a.event.startsAt.compareTo(b.event.startsAt));
   }
 }
