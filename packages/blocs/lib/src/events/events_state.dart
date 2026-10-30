@@ -13,3 +13,31 @@ sealed class EventsState extends Equatable {
 final class EventsLoading extends EventsState {
   const EventsLoading();
 }
+
+final class EventsFailure extends EventsState {
+  const EventsFailure(this.cause);
+
+  final Object cause;
+
+  @override
+  List<Object?> get props => [cause];
+
+  @override
+  String toString() => 'EventsFailure($cause)';
+}
+
+final class EventsEmpty extends EventsState {
+  const EventsEmpty();
+}
+
+final class EventsLoaded extends EventsState {
+  const EventsLoaded(this.events);
+
+  final List<EventListing> events;
+
+  @override
+  List<Object?> get props => [events];
+
+  @override
+  String toString() => 'EventsLoaded(${events.length} events)';
+}

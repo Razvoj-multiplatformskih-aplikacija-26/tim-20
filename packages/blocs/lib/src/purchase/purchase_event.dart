@@ -9,3 +9,13 @@ final class PurchaseStarted extends PurchaseEvent {
 
   final EventId eventId;
 }
+
+final class PurchaseQuantityChanged extends PurchaseEvent {
+  const PurchaseQuantityChanged(this.quantity);
+
+  final int quantity;
+}
+
+final class PurchaseSubmitted extends PurchaseEvent {
+  const PurchaseSubmitted();
+}
