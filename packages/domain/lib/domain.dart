@@ -1,6 +1,6 @@
 /// Domain model and rules for student event tickets.
 ///
-/// Pure Dart: no Flutter, no dart:io. Used by every client and the server.
+/// Pure Dart without platform libraries, used by every client and the server.
 library;
 
 export 'src/access_policy.dart';
