@@ -1,5 +1,6 @@
 import 'package:meta/meta.dart';
 
+import 'errors.dart';
 import 'result.dart';
 import 'rules.dart';
 
@@ -14,8 +15,11 @@ final class TicketQuantity {
 
   /// From [min] to [max] tickets, and together with [alreadyHeld] active tickets at most [maxTicketsPerEvent].
   static Result<TicketQuantity> parse(int requested, {required int alreadyHeld}) {
-    // D1
-    throw UnimplementedError();
+    if (requested < min || requested > max) return Failure(InvalidTicketQuantity(requested));
+    if (alreadyHeld + requested > maxTicketsPerEvent) {
+      return Failure(TicketLimitExceeded(alreadyHeld: alreadyHeld, requested: requested));
+    }
+    return Success(TicketQuantity._(requested));
   }
 
   @override
