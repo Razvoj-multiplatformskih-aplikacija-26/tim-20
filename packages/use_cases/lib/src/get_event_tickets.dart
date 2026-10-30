@@ -14,7 +14,18 @@ final class GetEventTickets {
 
   /// Null for an unknown event.
   Future<EventTickets?> call({required EventId eventId, required User staff}) async {
-    // F2
-    throw UnimplementedError();
+    final event = await events.findEvent(eventId);
+    if (event == null) return null;
+    final now = clock.now();
+    final shown = [
+      for (final ticket in await tickets.ticketsFor(eventId))
+        ticket.copyWith(status: effectiveStatus(ticket, now: now)),
+    ];
+    return EventTickets(
+      event: event,
+      tickets: shown,
+      summary: summarize(event, shown, now: now),
+      actions: {for (final ticket in shown) ticket.id: staffActionsFor(ticket, event, by: staff, now: now)},
+    );
   }
 }

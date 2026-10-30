@@ -8,8 +8,8 @@ final class GetOrganizerEvents {
   final EventRepository events;
 
   /// Events of [organizer], sorted by start.
-  Future<List<Event>> call(User organizer) async {
-    // F2
-    throw UnimplementedError();
-  }
+  Future<List<Event>> call(User organizer) async => [
+    for (final event in await events.upcoming())
+      if (event.organizerId == organizer.id) event,
+  ];
 }
