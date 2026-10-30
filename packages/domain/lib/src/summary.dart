@@ -4,6 +4,7 @@ import 'package:meta/meta.dart';
 
 import 'event.dart';
 import 'ticket.dart';
+import 'ticket_status.dart';
 
 @immutable
 final class TicketSummary {
@@ -51,6 +52,27 @@ final class TicketSummary {
 
 /// Counts the tickets of [event] by their status at [now].
 TicketSummary summarize(Event event, List<Ticket> ticketsOfEvent, {required DateTime now}) {
-  // F1
-  throw UnimplementedError();
+  var reserved = 0, paid = 0, used = 0, cancelled = 0, expired = 0;
+  for (final ticket in ticketsOfEvent) {
+    switch (effectiveStatus(ticket, now: now)) {
+      case Reserved():
+        reserved++;
+      case Paid():
+        paid++;
+      case Used():
+        used++;
+      case Cancelled():
+        cancelled++;
+      case Expired():
+        expired++;
+    }
+  }
+  return TicketSummary(
+    capacity: event.capacity,
+    reserved: reserved,
+    paid: paid,
+    used: used,
+    cancelled: cancelled,
+    expired: expired,
+  );
 }
