@@ -1,3 +1,4 @@
+export 'src/status_colors.dart';
 export 'src/text/domain_errors.dart';
 export 'src/text/format.dart';
 export 'src/text/ticket_status_label.dart';
