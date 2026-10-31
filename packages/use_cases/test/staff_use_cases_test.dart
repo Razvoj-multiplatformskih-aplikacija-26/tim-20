@@ -113,7 +113,7 @@ void main() {
 
       expect(result.valueOrNull?.status, Cancelled(at: now, by: organizer.id, reason: 'Duplikat.'));
       expect((await store.findTicket(const TicketId('t-1')))?.status, isA<Cancelled>());
-    }, skip: 'Waits for cancelTicket from the visitor rules (D1).');
+    });
 
     test('returns NotFound for an unknown id', () async {
       final store = InMemoryTicketing();
