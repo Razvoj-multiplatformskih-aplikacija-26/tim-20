@@ -5,6 +5,7 @@ import 'result.dart';
 import 'ticket.dart';
 import 'ticket_status.dart';
 import 'user.dart';
+import 'visitor_actions.dart';
 
 enum StaffAction { confirmPayment, admit, voidTicket }
 
@@ -30,12 +31,6 @@ Result<Ticket> admitTicket(Ticket ticket, {required User by, required DateTime n
 Set<StaffAction> staffActionsFor(Ticket ticket, Event event, {required User by, required DateTime now}) => {
   if (confirmPayment(ticket, by: by, now: now).isSuccess) StaffAction.confirmPayment,
   if (admitTicket(ticket, by: by, now: now).isSuccess) StaffAction.admit,
-  if (_mayVoid(ticket, event, by: by, now: now)) StaffAction.voidTicket,
+  // A visitor may cancel their own ticket, but that is not a staff action.
+  if (by.role.isStaff && cancelTicket(ticket, event, by: by, now: now).isSuccess) StaffAction.voidTicket,
 };
-
-// The checks cancelTicket makes for staff, until the visitor rules call it directly.
-bool _mayVoid(Ticket ticket, Event event, {required User by, required DateTime now}) {
-  if (!by.role.isStaff || !AccessPolicy.canCancel(by, ticket)) return false;
-  final current = effectiveStatus(ticket, now: now);
-  return canTransition(current, Cancelled(at: now.toUtc(), by: by.id)) && now.isBefore(event.startsAt);
-}
