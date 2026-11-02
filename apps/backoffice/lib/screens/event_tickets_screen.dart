@@ -6,7 +6,9 @@ import 'package:go_router/go_router.dart';
 import 'package:ui/ui.dart';
 
 import '../dependencies.dart';
+import '../shortcuts.dart';
 import '../widgets/debug_menu.dart';
+import '../widgets/shortcuts_overview.dart';
 import '../widgets/status_filter_bar.dart';
 import '../widgets/summary_header.dart';
 import '../widgets/ticket_detail_panel.dart';
@@ -50,12 +52,20 @@ class _EventTicketsView extends StatefulWidget {
 }
 
 class _EventTicketsViewState extends State<_EventTicketsView> {
+  final _tableFocus = FocusNode(debugLabel: 'ticket table');
+
   EventTicketsBloc get _bloc => context.read<EventTicketsBloc>();
 
   @override
   void didUpdateWidget(_EventTicketsView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedId != widget.selectedId) _syncWithRoute();
+  }
+
+  @override
+  void dispose() {
+    _tableFocus.dispose();
+    super.dispose();
   }
 
   // The address is the second owner of the selection: refresh in the browser and the back button go through it.
@@ -70,7 +80,28 @@ class _EventTicketsViewState extends State<_EventTicketsView> {
 
   void _select(Ticket? ticket) => _bloc.add(TicketSelected(ticket?.id));
 
-  Future<void> _void(Ticket ticket) async {
+  Ticket? get _selected => switch (_bloc.state) {
+    EventTicketsLoaded(:final selected) => selected,
+    EventTicketsLoading() || EventTicketsFailure() || EventTicketsNotFound() || EventTicketsEmpty() => null,
+  };
+
+  bool _selectedAllows(StaffAction action) => switch (_bloc.state) {
+    EventTicketsLoaded(:final selected, :final isBusy) && final state =>
+      !isBusy && selected != null && state.actionsFor(selected.id).contains(action),
+    EventTicketsLoading() || EventTicketsFailure() || EventTicketsNotFound() || EventTicketsEmpty() => false,
+  };
+
+  void _confirm() {
+    if (_selected case final ticket?) _bloc.add(PaymentConfirmationRequested(ticket.id));
+  }
+
+  void _admit() {
+    if (_selected case final ticket?) _bloc.add(TicketAdmissionRequested(ticket.id));
+  }
+
+  Future<void> _void() async {
+    final ticket = _selected;
+    if (ticket == null) return;
     final reason = await showVoidTicketDialog(context, ticket);
     if (!mounted || reason == null) return;
     _bloc.add(TicketVoidRequested(ticket.id, reason: reason.trim()));
@@ -93,49 +124,92 @@ class _EventTicketsViewState extends State<_EventTicketsView> {
   @override
   Widget build(BuildContext context) {
     final bloc = _bloc;
-    return BlocListener<EventTicketsBloc, EventTicketsState>(
-      listenWhen: (previous, current) =>
-          current is EventTicketsLoaded &&
-          (previous is! EventTicketsLoaded || previous.selectedId != current.selectedId),
-      listener: (context, state) {
-        final selectedId = (state as EventTicketsLoaded).selectedId;
-        if (selectedId != widget.selectedId) _goTo(selected: selectedId);
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          leading: BackButton(onPressed: () => context.go('/')),
-          title: BlocBuilder<EventTicketsBloc, EventTicketsState>(
-            builder: (context, state) => Text(switch (state) {
-              EventTicketsLoaded(:final data) => data.event.name,
-              EventTicketsEmpty(:final event) => event.name,
-              EventTicketsLoading() || EventTicketsFailure() || EventTicketsNotFound() => 'Karte',
-            }),
+    return Shortcuts(
+      shortcuts: ticketShortcuts(),
+      child: Actions(
+        actions: {
+          ConfirmPaymentIntent: GuardedCallbackAction<ConfirmPaymentIntent>(
+            enabled: () => _selectedAllows(StaffAction.confirmPayment),
+            onInvoke: (_) => _confirm(),
           ),
-          actions: [
-            IconButton(
-              tooltip: 'Osveži (R)',
-              icon: const Icon(Icons.refresh),
-              onPressed: () => bloc.add(const EventTicketsRefreshed()),
+          AdmitTicketIntent: GuardedCallbackAction<AdmitTicketIntent>(
+            enabled: () => _selectedAllows(StaffAction.admit),
+            onInvoke: (_) => _admit(),
+          ),
+          VoidTicketIntent: GuardedCallbackAction<VoidTicketIntent>(
+            enabled: () => _selectedAllows(StaffAction.voidTicket),
+            onInvoke: (_) => _void(),
+          ),
+          RefreshIntent: CallbackAction<RefreshIntent>(onInvoke: (_) => bloc.add(const EventTicketsRefreshed())),
+          ClearSelectionIntent: CallbackAction<ClearSelectionIntent>(
+            onInvoke: (_) {
+              _select(null);
+              _tableFocus.requestFocus();
+              return null;
+            },
+          ),
+          ShowShortcutsIntent: CallbackAction<ShowShortcutsIntent>(onInvoke: (_) => showShortcutsOverview(context)),
+        },
+        child: FocusScope(
+          autofocus: true,
+          child: BlocListener<EventTicketsBloc, EventTicketsState>(
+            listenWhen: (previous, current) =>
+                current is EventTicketsLoaded &&
+                (previous is! EventTicketsLoaded || previous.selectedId != current.selectedId),
+            listener: (context, state) {
+              final selectedId = (state as EventTicketsLoaded).selectedId;
+              if (selectedId != widget.selectedId) _goTo(selected: selectedId);
+            },
+            child: Scaffold(
+              appBar: AppBar(
+                leading: BackButton(onPressed: () => context.go('/')),
+                title: BlocBuilder<EventTicketsBloc, EventTicketsState>(
+                  builder: (context, state) => Text(switch (state) {
+                    EventTicketsLoaded(:final data) => data.event.name,
+                    EventTicketsEmpty(:final event) => event.name,
+                    EventTicketsLoading() || EventTicketsFailure() || EventTicketsNotFound() => 'Karte',
+                  }),
+                ),
+                actions: [
+                  IconButton(
+                    tooltip: 'Osveži (R)',
+                    icon: const Icon(Icons.refresh),
+                    onPressed: () => bloc.add(const EventTicketsRefreshed()),
+                  ),
+                  IconButton(
+                    tooltip: 'Prečice (?)',
+                    icon: const Icon(Icons.keyboard_outlined),
+                    onPressed: () => showShortcutsOverview(context),
+                  ),
+                  const DebugMenu(),
+                  const SizedBox(width: 8),
+                ],
+              ),
+              body: BlocConsumer<EventTicketsBloc, EventTicketsState>(
+                listenWhen: (previous, current) => current is EventTicketsLoaded && current.notice != null,
+                listener: (context, state) => _showNotice(context, (state as EventTicketsLoaded).notice!),
+                builder: (context, state) => switch (state) {
+                  EventTicketsLoading() => const LoadingView(),
+                  EventTicketsFailure() => FailureView(
+                    onRetry: () => bloc.add(EventTicketsRequested(widget.eventId, selectedId: widget.selectedId)),
+                  ),
+                  EventTicketsNotFound() => const EmptyView(title: 'Događaj nije pronađen.'),
+                  EventTicketsEmpty(:final event) => EmptyView(
+                    title: 'Još nema karata za ovaj događaj.',
+                    message: '${event.capacity} mesta · ${formatDateTime(event.startsAt)}',
+                  ),
+                  EventTicketsLoaded() => _LoadedBody(
+                    state: state,
+                    tableFocus: _tableFocus,
+                    onSelect: _select,
+                    onConfirm: _confirm,
+                    onAdmit: _admit,
+                    onVoid: _void,
+                  ),
+                },
+              ),
             ),
-            const DebugMenu(),
-            const SizedBox(width: 8),
-          ],
-        ),
-        body: BlocConsumer<EventTicketsBloc, EventTicketsState>(
-          listenWhen: (previous, current) => current is EventTicketsLoaded && current.notice != null,
-          listener: (context, state) => _showNotice(context, (state as EventTicketsLoaded).notice!),
-          builder: (context, state) => switch (state) {
-            EventTicketsLoading() => const LoadingView(),
-            EventTicketsFailure() => FailureView(
-              onRetry: () => bloc.add(EventTicketsRequested(widget.eventId, selectedId: widget.selectedId)),
-            ),
-            EventTicketsNotFound() => const EmptyView(title: 'Događaj nije pronađen.'),
-            EventTicketsEmpty(:final event) => EmptyView(
-              title: 'Još nema karata za ovaj događaj.',
-              message: '${event.capacity} mesta · ${formatDateTime(event.startsAt)}',
-            ),
-            EventTicketsLoaded() => _LoadedBody(state: state, onSelect: _select, onVoid: _void),
-          },
+          ),
         ),
       ),
     );
@@ -143,11 +217,21 @@ class _EventTicketsViewState extends State<_EventTicketsView> {
 }
 
 class _LoadedBody extends StatelessWidget {
-  const _LoadedBody({required this.state, required this.onSelect, required this.onVoid});
+  const _LoadedBody({
+    required this.state,
+    required this.tableFocus,
+    required this.onSelect,
+    required this.onConfirm,
+    required this.onAdmit,
+    required this.onVoid,
+  });
 
   final EventTicketsLoaded state;
+  final FocusNode tableFocus;
   final ValueChanged<Ticket?> onSelect;
-  final ValueChanged<Ticket> onVoid;
+  final VoidCallback onConfirm;
+  final VoidCallback onAdmit;
+  final VoidCallback onVoid;
 
   @override
   Widget build(BuildContext context) {
@@ -168,11 +252,18 @@ class _LoadedBody extends StatelessWidget {
           child: Row(
             children: [
               Expanded(
-                child: TicketTable(
-                  tickets: state.visible,
-                  cursor: state.cursor,
-                  selectedId: state.selectedId,
-                  onSelect: onSelect,
+                // The cursor is drawn only while the table has the keyboard, like a focus ring.
+                child: ListenableBuilder(
+                  listenable: tableFocus,
+                  builder: (context, _) => TicketTable(
+                    tickets: state.visible,
+                    cursor: tableFocus.hasFocus ? state.cursor : null,
+                    selectedId: state.selectedId,
+                    focusNode: tableFocus,
+                    onSelect: onSelect,
+                    onCursorMoved: (delta) => bloc.add(TicketCursorMoved(delta)),
+                    onActivate: () => bloc.add(const TicketCursorActivated()),
+                  ),
                 ),
               ),
               if (selected != null) ...[
@@ -183,9 +274,9 @@ class _LoadedBody extends StatelessWidget {
                     ticket: selected,
                     actions: state.actionsFor(selected.id),
                     busy: state.isBusy,
-                    onConfirm: () => bloc.add(PaymentConfirmationRequested(selected.id)),
-                    onAdmit: () => bloc.add(TicketAdmissionRequested(selected.id)),
-                    onVoid: () => onVoid(selected),
+                    onConfirm: onConfirm,
+                    onAdmit: onAdmit,
+                    onVoid: onVoid,
                     onClose: () => onSelect(null),
                   ),
                 ),
