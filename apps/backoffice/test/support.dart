@@ -25,7 +25,8 @@ Future<BackofficeDependencies> pumpBackoffice(
   tester.binding.platformDispatcher.defaultRouteNameTestValue = location;
   addTearDown(tester.binding.platformDispatcher.clearDefaultRouteNameTestValue);
   final deps = dependencies ?? fakeDependencies();
-  await tester.pumpWidget(BackofficeApp(dependencies: deps));
+  // A new key gives a new router, so a second pump in the same test starts at [location] again.
+  await tester.pumpWidget(BackofficeApp(key: UniqueKey(), dependencies: deps));
   return deps;
 }
 
