@@ -26,14 +26,15 @@ class TicketTile extends StatelessWidget {
     final event = owned.event;
     final status = owned.ticket.status;
     return Card(
-      child: InkWell(
-        onTap: onOpen,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              MergeSemantics(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // The header opens the detail and reads as one item; the buttons below stay separate.
+          MergeSemantics(
+            child: InkWell(
+              onTap: onOpen,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -57,25 +58,27 @@ class TicketTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (busy)
-                    const ActionProgress()
-                  else ...[
-                    if (onCancel case final cancel?) TextButton(onPressed: cancel, child: const Text('Otkaži')),
-                    if (onPay case final pay?) ...[
-                      const SizedBox(width: 8),
-                      FilledButton.tonal(onPressed: pay, child: const Text('Plati')),
-                    ],
-                    if (onCancel == null && onPay == null) const SizedBox(height: 40),
-                  ],
-                ],
-              ),
-            ],
+            ),
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (busy)
+                  const ActionProgress()
+                else ...[
+                  if (onCancel case final cancel?) TextButton(onPressed: cancel, child: const Text('Otkaži')),
+                  if (onPay case final pay?) ...[
+                    const SizedBox(width: 8),
+                    FilledButton.tonal(onPressed: pay, child: const Text('Plati')),
+                  ],
+                  if (onCancel == null && onPay == null) const SizedBox(height: 40),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
