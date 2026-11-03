@@ -30,8 +30,9 @@ class TicketDetailScreen extends StatelessWidget {
           body: switch (state) {
             MyTicketsLoading() => const LoadingView(),
             MyTicketsFailure() => FailureView(onRetry: () => bloc.add(const MyTicketsRequested())),
-            MyTicketsEmpty() || MyTicketsLoaded() =>
-              owned == null ? const EmptyView(title: 'Karta nije pronađena.') : _Details(owned: owned),
+            MyTicketsEmpty() => const EmptyView(title: 'Karta nije pronađena.'),
+            MyTicketsLoaded(:final loadedAt) =>
+              owned == null ? const EmptyView(title: 'Karta nije pronađena.') : _Details(owned: owned, now: loadedAt),
           },
           bottomNavigationBar: owned == null || state is! MyTicketsLoaded
               ? null
@@ -52,15 +53,18 @@ class TicketDetailScreen extends StatelessWidget {
 }
 
 class _Details extends StatelessWidget {
-  const _Details({required this.owned});
+  const _Details({required this.owned, required this.now});
 
   final OwnedTicket owned;
+
+  /// The moment the actions were decided, so the note agrees with them.
+  final DateTime now;
 
   /// Why an active ticket cannot be cancelled: the same rule the bloc would run, asked only for its error.
   String? _cancellationNote(BuildContext context) {
     if (owned.actions.contains(VisitorAction.cancel) || !owned.ticket.status.isActive) return null;
-    final dependencies = context.read<AppDependencies>();
-    final result = cancelTicket(owned.ticket, owned.event, by: dependencies.visitor, now: dependencies.clock.now());
+    final visitor = context.read<AppDependencies>().visitor;
+    final result = cancelTicket(owned.ticket, owned.event, by: visitor, now: now);
     return switch (result) {
       Success() => null,
       Failure(:final error) => error.message,
