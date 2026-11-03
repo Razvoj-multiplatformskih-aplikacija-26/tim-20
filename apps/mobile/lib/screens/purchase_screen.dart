@@ -147,7 +147,10 @@ class _PurchaseForm extends StatelessWidget {
           controller: quantityController,
           enabled: !state.submitting,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Broj karata', helperText: 'Najviše 4 karte po događaju.'),
+          decoration: InputDecoration(
+            labelText: 'Broj karata',
+            helperText: 'Najviše ${ticketsLabel(TicketQuantity.max)} po događaju.',
+          ),
           validator: _validate,
           onChanged: (text) {
             final quantity = int.tryParse(text);
