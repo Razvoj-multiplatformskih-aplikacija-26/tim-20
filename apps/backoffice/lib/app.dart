@@ -36,6 +36,7 @@ class _BackofficeAppState extends State<BackofficeApp> {
               ..add(const OrganizerEventsRequested()),
         child: MaterialApp.router(
           title: 'Ulaznice · organizator',
+          debugShowCheckedModeBanner: false,
           theme: TicketsTheme.light(),
           darkTheme: TicketsTheme.dark(),
           themeMode: ThemeMode.system,

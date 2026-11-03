@@ -47,6 +47,7 @@ class StatusFilterBar extends StatelessWidget {
               label: Text(_label(value)),
               avatar: Text('${_count(value)}', style: Theme.of(context).textTheme.labelSmall),
               selected: value == filter,
+              showCheckmark: false,
               onSelected: (_) => onChanged(value),
             ),
         ],
