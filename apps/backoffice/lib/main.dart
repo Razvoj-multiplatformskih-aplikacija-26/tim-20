@@ -1,19 +1,14 @@
+import 'package:blocs/blocs.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:ui/ui.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 
-// F4: app.dart, dependencies.dart, router.dart. Placeholder until then.
-void main() => runApp(const BackofficeApp());
+import 'app.dart';
+import 'dependencies.dart';
 
-class BackofficeApp extends StatelessWidget {
-  const BackofficeApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Ulaznice · organizator',
-      theme: TicketsTheme.light(),
-      darkTheme: TicketsTheme.dark(),
-      home: const Scaffold(body: EmptyView(title: 'Ulaznice · organizator')),
-    );
-  }
+void main() {
+  usePathUrlStrategy();
+  if (kDebugMode) Bloc.observer = ConsoleBlocObserver(debugPrint);
+  runApp(BackofficeApp(dependencies: BackofficeDependencies.fake()));
 }
