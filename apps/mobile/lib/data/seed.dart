@@ -124,6 +124,7 @@ List<Ticket> seedTickets(DateTime now) {
     ticket('a-10', 'e-6', Paid(paidAt: now.subtract(const Duration(hours: 5)))),
     ticket('a-11', 'e-1', Reserved(expiresAt: now.add(const Duration(minutes: 12))), age: const Duration(minutes: 3)),
     ticket('a-12', 'e-7', Paid(paidAt: now.subtract(const Duration(hours: 30)))),
+    ticket('a-13', 'e-1', Paid(paidAt: now.subtract(const Duration(hours: 20)))),
     // Other visitors, so that the stand-up night has a single seat left.
     for (var i = 0; i < 10; i++) other('e-3'),
     for (var i = 0; i < 25; i++) other('e-1'),
