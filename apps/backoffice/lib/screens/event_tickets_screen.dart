@@ -12,6 +12,7 @@ import '../widgets/shortcuts_overview.dart';
 import '../widgets/status_filter_bar.dart';
 import '../widgets/summary_header.dart';
 import '../widgets/ticket_detail_panel.dart';
+import '../widgets/ticket_list.dart';
 import '../widgets/ticket_table.dart';
 import '../widgets/void_ticket_dialog.dart';
 
@@ -69,10 +70,15 @@ class _EventTicketsViewState extends State<_EventTicketsView> {
   }
 
   // The address is the second owner of the selection: refresh in the browser and the back button go through it.
+  // Once the tickets are loaded the address wins, unless it names a ticket this event does not have.
   void _syncWithRoute() {
     final state = _bloc.state;
-    if (state is EventTicketsLoaded && state.selectedId != widget.selectedId) {
-      _bloc.add(TicketSelected(widget.selectedId));
+    if (state is! EventTicketsLoaded || state.selectedId == widget.selectedId) return;
+    final wanted = widget.selectedId;
+    if (wanted != null && !state.data.tickets.any((t) => t.id == wanted)) {
+      _goTo(selected: state.selectedId);
+    } else {
+      _bloc.add(TicketSelected(wanted));
     }
   }
 
@@ -152,14 +158,23 @@ class _EventTicketsViewState extends State<_EventTicketsView> {
         },
         child: FocusScope(
           autofocus: true,
-          child: BlocListener<EventTicketsBloc, EventTicketsState>(
-            listenWhen: (previous, current) =>
-                current is EventTicketsLoaded &&
-                (previous is! EventTicketsLoaded || previous.selectedId != current.selectedId),
-            listener: (context, state) {
-              final selectedId = (state as EventTicketsLoaded).selectedId;
-              if (selectedId != widget.selectedId) _goTo(selected: selectedId);
-            },
+          child: MultiBlocListener(
+            listeners: [
+              BlocListener<EventTicketsBloc, EventTicketsState>(
+                listenWhen: (previous, current) => previous is! EventTicketsLoaded && current is EventTicketsLoaded,
+                listener: (context, state) => _syncWithRoute(),
+              ),
+              BlocListener<EventTicketsBloc, EventTicketsState>(
+                listenWhen: (previous, current) =>
+                    previous is EventTicketsLoaded &&
+                    current is EventTicketsLoaded &&
+                    previous.selectedId != current.selectedId,
+                listener: (context, state) {
+                  final selectedId = (state as EventTicketsLoaded).selectedId;
+                  if (selectedId != widget.selectedId) _goTo(selected: selectedId);
+                },
+              ),
+            ],
             child: Scaffold(
               appBar: AppBar(
                 leading: BackButton(onPressed: () => context.go('/')),
@@ -226,12 +241,53 @@ class _LoadedBody extends StatelessWidget {
     required this.onVoid,
   });
 
+  /// Below this width the table becomes a list and the panel a bottom sheet.
+  static const narrowBelow = 840.0;
+
   final EventTicketsLoaded state;
   final FocusNode tableFocus;
   final ValueChanged<Ticket?> onSelect;
   final VoidCallback onConfirm;
   final VoidCallback onAdmit;
   final VoidCallback onVoid;
+
+  // The sheet is on the Navigator, above this screen, so the bloc is handed to it explicitly.
+  Future<void> _showDetailSheet(BuildContext context) {
+    final bloc = context.read<EventTicketsBloc>();
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        void close(VoidCallback action) {
+          Navigator.pop(sheetContext);
+          action();
+        }
+
+        return SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * 0.7,
+          child: BlocProvider.value(
+            value: bloc,
+            child: BlocBuilder<EventTicketsBloc, EventTicketsState>(
+              builder: (context, state) {
+                final selected = state is EventTicketsLoaded ? state.selected : null;
+                if (state is! EventTicketsLoaded || selected == null) return const SizedBox.shrink();
+                return TicketDetailPanel(
+                  ticket: selected,
+                  actions: state.actionsFor(selected.id),
+                  busy: state.isBusy,
+                  onConfirm: () => close(onConfirm),
+                  onAdmit: () => close(onAdmit),
+                  onVoid: () => close(onVoid),
+                  onClose: () => Navigator.pop(sheetContext),
+                );
+              },
+            ),
+          ),
+        );
+      },
+    ).then((_) => onSelect(null));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -249,39 +305,54 @@ class _LoadedBody extends StatelessWidget {
           onChanged: (filter) => bloc.add(TicketStatusFilterChanged(filter)),
         ),
         Expanded(
-          child: Row(
-            children: [
-              Expanded(
-                // The cursor is drawn only while the table has the keyboard, like a focus ring.
-                child: ListenableBuilder(
-                  listenable: tableFocus,
-                  builder: (context, _) => TicketTable(
-                    tickets: state.visible,
-                    cursor: tableFocus.hasFocus ? state.cursor : null,
-                    selectedId: state.selectedId,
-                    focusNode: tableFocus,
-                    onSelect: onSelect,
-                    onCursorMoved: (delta) => bloc.add(TicketCursorMoved(delta)),
-                    onActivate: () => bloc.add(const TicketCursorActivated()),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth < narrowBelow) {
+                return TicketList(
+                  tickets: state.visible,
+                  cursor: state.cursor,
+                  selectedId: state.selectedId,
+                  onSelect: (ticket) {
+                    onSelect(ticket);
+                    _showDetailSheet(context);
+                  },
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(
+                    // The cursor is drawn only while the table has the keyboard, like a focus ring.
+                    child: ListenableBuilder(
+                      listenable: tableFocus,
+                      builder: (context, _) => TicketTable(
+                        tickets: state.visible,
+                        cursor: tableFocus.hasFocus ? state.cursor : null,
+                        selectedId: state.selectedId,
+                        focusNode: tableFocus,
+                        onSelect: onSelect,
+                        onCursorMoved: (delta) => bloc.add(TicketCursorMoved(delta)),
+                        onActivate: () => bloc.add(const TicketCursorActivated()),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              if (selected != null) ...[
-                const VerticalDivider(width: 1),
-                SizedBox(
-                  width: 340,
-                  child: TicketDetailPanel(
-                    ticket: selected,
-                    actions: state.actionsFor(selected.id),
-                    busy: state.isBusy,
-                    onConfirm: onConfirm,
-                    onAdmit: onAdmit,
-                    onVoid: onVoid,
-                    onClose: () => onSelect(null),
-                  ),
-                ),
-              ],
-            ],
+                  if (selected != null) ...[
+                    const VerticalDivider(width: 1),
+                    SizedBox(
+                      width: 340,
+                      child: TicketDetailPanel(
+                        ticket: selected,
+                        actions: state.actionsFor(selected.id),
+                        busy: state.isBusy,
+                        onConfirm: onConfirm,
+                        onAdmit: onAdmit,
+                        onVoid: onVoid,
+                        onClose: () => onSelect(null),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
         ),
       ],
