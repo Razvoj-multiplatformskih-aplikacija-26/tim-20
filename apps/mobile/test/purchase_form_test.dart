@@ -1,5 +1,7 @@
+import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/text.dart';
 
 import 'support.dart';
 
@@ -12,6 +14,7 @@ void main() {
 
   testWidgets('purchase form rejects 5 tickets with a Serbian message', (tester) async {
     await openForm(tester, 'e-5');
+    expect(find.text('Najviše ${ticketsLabel(TicketQuantity.max)} po događaju.'), findsOneWidget);
 
     await tester.enterText(find.byType(TextFormField), '5');
     await tester.tap(find.text('Kupi'));
