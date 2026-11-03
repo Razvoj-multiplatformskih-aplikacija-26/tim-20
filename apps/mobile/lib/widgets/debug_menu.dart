@@ -17,10 +17,15 @@ class DebugMenu extends StatelessWidget {
       tooltip: 'Simulacija',
       icon: const Icon(Icons.bug_report_outlined),
       onSelected: (simulation) {
-        final message = switch (simulation) {
-          _Simulation.outage => (fake.failingRequests = 1, 'Sledeći zahtev neće uspeti.').$2,
-          _Simulation.emptyAnswer => (fake.emptyResponses = 1, 'Sledeći odgovor biće prazan.').$2,
-        };
+        final String message;
+        switch (simulation) {
+          case _Simulation.outage:
+            fake.failingRequests = 1;
+            message = 'Sledeći zahtev neće uspeti.';
+          case _Simulation.emptyAnswer:
+            fake.emptyResponses = 1;
+            message = 'Sledeći odgovor biće prazan.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       },
       itemBuilder: (context) => const [
