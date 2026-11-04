@@ -42,6 +42,50 @@ flowchart LR
   S --> DB[(PostgreSQL)]
 ```
 
+## Pokretanje
+
+Potreban je Flutter 3.47 (Dart 3.13). Sve aplikacije i paketi su u jednom pub workspace-u, pa se zavisnosti povlače jednom, iz korena:
+
+```sh
+flutter pub get
+```
+
+Mobilna aplikacija (Android emulator ili iOS simulator):
+
+```sh
+cd apps/mobile && flutter run
+```
+
+Backoffice (macOS ili Chrome):
+
+```sh
+cd apps/backoffice && flutter run -d macos
+cd apps/backoffice && flutter run -d chrome
+```
+
+Podaci su lažni i žive u memoriji aplikacije. U debug verziji gornja traka nudi **Simuliraj grešku** i **Simuliraj prazan odgovor** (u backoffice-u kao dugmad, u mobilnoj aplikaciji u meniju iza ikonice bube), pa sledeći zahtev ne uspe ili vrati praznu listu i vide se sva četiri stanja ekrana.
+
+Provera kao na CI-ju:
+
+```sh
+dart format --output=none --set-exit-if-changed . && flutter analyze
+(cd packages/domain && dart test) && (cd packages/use_cases && dart test) && (cd packages/blocs && dart test)
+(cd packages/ui && flutter test) && (cd apps/backoffice && flutter test) && (cd apps/mobile && flutter test)
+```
+
+## Struktura
+
+```
+apps/mobile          mobilna aplikacija za posetioce (Android, iOS)
+apps/backoffice      backoffice za organizatore (macOS, veb)
+packages/domain      model, stanja karte, pravila i izračunavanja; čist Dart
+packages/use_cases   portovi ka podacima, sat i slučajevi korišćenja; čist Dart
+packages/blocs       Bloc-ovi ekrana za oba klijenta; čist Dart
+packages/ui          tema, zajednički widget-i i sve poruke na srpskom
+```
+
+Zavisnosti idu samo naniže: `apps → blocs → use_cases → domain` i `apps → ui → domain`. Paketi `domain`, `use_cases` i `blocs` ne uvoze Flutter ni platformske biblioteke, pa će isti kod koristiti i server.
+
 ## Stanje projekta
 
-Opis sistema. Detaljan opis domena i kod dodaju se tokom semestra.
+**KT1 — dva klijenta nad istim domenom.** Mobilna aplikacija za posetioca i backoffice za organizatora rade nad istim paketima, sa lažnim podacima u memoriji. Karta prolazi kroz stanja rezervisana → plaćena → iskorišćena, uz otkazanu i isteklu; pravila (najviše 4 karte, otkazivanje do 24 h pre početka, kapacitet, jedan ulaz po karti) su u `packages/domain` i vraćaju tipizovane greške koje aplikacije prevode u poruke. Server, prijava i rad bez mreže dolaze u narednim kontrolnim tačkama.
