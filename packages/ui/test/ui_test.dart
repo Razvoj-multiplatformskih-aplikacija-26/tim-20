@@ -33,6 +33,12 @@ void main() {
     expect(const TicketLimitExceeded(alreadyHeld: 3, requested: 2, max: 4).message, contains('3'));
   });
 
+  test('messages show the limits the rule reported, so a newer server explains its own limits', () {
+    expect(const TicketLimitExceeded(alreadyHeld: 1, requested: 2, max: 2).message, contains('najviše 2 karte'));
+    expect(const InvalidTicketQuantity(3, min: 1, max: 2).message, 'Broj karata je od 1 do 2.');
+    expect(const CancellationTooLate(notice: Duration(hours: 48)).message, contains('48 sata'));
+  });
+
   group('TicketsTheme', () {
     test('uses Inter from this package', () {
       expect(TicketsTheme.light().textTheme.bodyMedium?.fontFamily, 'packages/ui/Inter');
