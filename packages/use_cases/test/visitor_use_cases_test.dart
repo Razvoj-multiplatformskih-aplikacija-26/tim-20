@@ -187,7 +187,7 @@ void main() {
       );
       final store = InMemoryTicketing(events: [tomorrow], tickets: [paidTicket]);
       final result = await CancelTicket(events: store, tickets: store, clock: clock)(id: paidTicket.id, by: ana);
-      expect(result, const Failure<Ticket>(CancellationTooLate()));
+      expect(result, const Failure<Ticket>(CancellationTooLate(notice: Duration(hours: 24))));
       expect(await store.findTicket(paidTicket.id), paidTicket);
     });
   });

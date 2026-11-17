@@ -65,7 +65,7 @@ void main() {
     expect: () => [
       isA<PurchaseReady>()
           .having((s) => s.quantity, 'quantity', 5)
-          .having((s) => s.validation, 'validation', const InvalidTicketQuantity(5)),
+          .having((s) => s.validation, 'validation', const InvalidTicketQuantity(5, min: 1, max: 4)),
     ],
   );
 
@@ -81,7 +81,7 @@ void main() {
       isA<PurchaseReady>().having(
         (s) => s.validation,
         'validation',
-        const TicketLimitExceeded(alreadyHeld: 3, requested: 2),
+        const TicketLimitExceeded(alreadyHeld: 3, requested: 2, max: 4),
       ),
     ],
   );

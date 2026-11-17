@@ -15,9 +15,9 @@ final class TicketQuantity {
 
   /// From [min] to [max] tickets, and together with [alreadyHeld] active tickets at most [maxTicketsPerEvent].
   static Result<TicketQuantity> parse(int requested, {required int alreadyHeld}) {
-    if (requested < min || requested > max) return Failure(InvalidTicketQuantity(requested));
+    if (requested < min || requested > max) return Failure(InvalidTicketQuantity(requested, min: min, max: max));
     if (alreadyHeld + requested > maxTicketsPerEvent) {
-      return Failure(TicketLimitExceeded(alreadyHeld: alreadyHeld, requested: requested));
+      return Failure(TicketLimitExceeded(alreadyHeld: alreadyHeld, requested: requested, max: maxTicketsPerEvent));
     }
     return Success(TicketQuantity._(requested));
   }

@@ -16,11 +16,11 @@ void main() {
 
   test('every domain error has a Serbian message', () {
     final errors = <DomainError>[
-      const InvalidTicketQuantity(0),
-      const TicketLimitExceeded(alreadyHeld: 3, requested: 2),
+      const InvalidTicketQuantity(0, min: 1, max: 4),
+      const TicketLimitExceeded(alreadyHeld: 3, requested: 2, max: 4),
       const NotEnoughSeats(0),
       const EventAlreadyStarted(),
-      const CancellationTooLate(),
+      const CancellationTooLate(notice: Duration(hours: 24)),
       const ReservationExpired(),
       const TicketAlreadyUsed(),
       InvalidTransition(from: statuses[1], to: statuses[1]),
@@ -30,7 +30,7 @@ void main() {
     for (final error in errors) {
       expect(error.message, isNotEmpty, reason: '$error');
     }
-    expect(const TicketLimitExceeded(alreadyHeld: 3, requested: 2).message, contains('3'));
+    expect(const TicketLimitExceeded(alreadyHeld: 3, requested: 2, max: 4).message, contains('3'));
   });
 
   group('TicketsTheme', () {

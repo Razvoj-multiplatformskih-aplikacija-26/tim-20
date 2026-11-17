@@ -7,37 +7,46 @@ sealed class DomainError {
 }
 
 @immutable
+/// The rule carries its limits, so a message shows the limits of whoever checked it, the client or the server.
+@immutable
 final class InvalidTicketQuantity extends DomainError {
-  const InvalidTicketQuantity(this.requested);
+  const InvalidTicketQuantity(this.requested, {required this.min, required this.max});
 
   final int requested;
+  final int min;
+  final int max;
 
   @override
-  bool operator ==(Object other) => other is InvalidTicketQuantity && other.requested == requested;
+  bool operator ==(Object other) =>
+      other is InvalidTicketQuantity && other.requested == requested && other.min == min && other.max == max;
 
   @override
-  int get hashCode => Object.hash(InvalidTicketQuantity, requested);
+  int get hashCode => Object.hash(InvalidTicketQuantity, requested, min, max);
 
   @override
-  String toString() => 'InvalidTicketQuantity($requested)';
+  String toString() => 'InvalidTicketQuantity($requested, from $min to $max)';
 }
 
 @immutable
 final class TicketLimitExceeded extends DomainError {
-  const TicketLimitExceeded({required this.alreadyHeld, required this.requested});
+  const TicketLimitExceeded({required this.alreadyHeld, required this.requested, required this.max});
 
   final int alreadyHeld;
   final int requested;
+  final int max;
 
   @override
   bool operator ==(Object other) =>
-      other is TicketLimitExceeded && other.alreadyHeld == alreadyHeld && other.requested == requested;
+      other is TicketLimitExceeded &&
+      other.alreadyHeld == alreadyHeld &&
+      other.requested == requested &&
+      other.max == max;
 
   @override
-  int get hashCode => Object.hash(TicketLimitExceeded, alreadyHeld, requested);
+  int get hashCode => Object.hash(TicketLimitExceeded, alreadyHeld, requested, max);
 
   @override
-  String toString() => 'TicketLimitExceeded(held $alreadyHeld, requested $requested)';
+  String toString() => 'TicketLimitExceeded(held $alreadyHeld, requested $requested, max $max)';
 }
 
 @immutable
@@ -60,8 +69,20 @@ final class EventAlreadyStarted extends DomainError {
   const EventAlreadyStarted();
 }
 
+@immutable
 final class CancellationTooLate extends DomainError {
-  const CancellationTooLate();
+  const CancellationTooLate({required this.notice});
+
+  final Duration notice;
+
+  @override
+  bool operator ==(Object other) => other is CancellationTooLate && other.notice == notice;
+
+  @override
+  int get hashCode => Object.hash(CancellationTooLate, notice);
+
+  @override
+  String toString() => 'CancellationTooLate(notice $notice)';
 }
 
 final class ReservationExpired extends DomainError {

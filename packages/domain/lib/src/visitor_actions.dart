@@ -78,7 +78,7 @@ Result<Ticket> cancelTicket(Ticket ticket, Event event, {required User by, requi
 
   if (!now.isBefore(event.startsAt)) return const Failure(EventAlreadyStarted());
   if (by.role == Role.visitor && now.isAfter(event.startsAt.subtract(cancellationNotice))) {
-    return const Failure(CancellationTooLate());
+    return const Failure(CancellationTooLate(notice: cancellationNotice));
   }
   return Success(ticket.copyWith(status: next));
 }

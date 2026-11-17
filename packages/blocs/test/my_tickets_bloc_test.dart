@@ -112,7 +112,11 @@ void main() {
     skip: 3,
     expect: () => [
       isA<MyTicketsLoaded>()
-          .having((s) => s.notice, 'notice', const TicketActionRejected(CancellationTooLate()))
+          .having(
+            (s) => s.notice,
+            'notice',
+            const TicketActionRejected(CancellationTooLate(notice: Duration(hours: 24))),
+          )
           .having((s) => s.byId(const TicketId('t-3'))?.ticket.status, 'status', Paid(paidAt: now))
           .having((s) => s.inFlightId, 'inFlight', isNull),
     ],

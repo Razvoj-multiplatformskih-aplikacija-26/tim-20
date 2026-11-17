@@ -118,6 +118,6 @@ void main() {
 
     expect(badge('Plaćena'), findsOneWidget);
     expect(find.text('Otkaži'), findsNothing);
-    expect(find.text(const CancellationTooLate().message), findsOneWidget);
+    expect(find.text(const CancellationTooLate(notice: cancellationNotice).message), findsOneWidget);
   });
 }
