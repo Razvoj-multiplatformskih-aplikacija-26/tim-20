@@ -11,13 +11,12 @@ final class AppDependencies {
     required this.visitor,
     required EventRepository events,
     required TicketRepository tickets,
-    required TicketId Function() newId,
     this.fake,
-  }) : getUpcomingEvents = GetUpcomingEvents(events: events, tickets: tickets, clock: clock),
+  }) : getUpcomingEvents = GetUpcomingEvents(events: events, clock: clock),
        getMyTickets = GetMyTickets(events: events, tickets: tickets, clock: clock),
        getPurchaseContext = GetPurchaseContext(events: events, tickets: tickets, clock: clock),
-       reserveTickets = ReserveTickets(events: events, tickets: tickets, clock: clock, newId: newId),
-       payTicket = PayTicket(tickets: tickets, clock: clock),
+       reserveTickets = ReserveTickets(events: events, tickets: tickets, clock: clock),
+       payTicket = PayTicket(events: events, tickets: tickets, clock: clock),
        cancelTicket = CancelTicket(events: events, tickets: tickets, clock: clock);
 
   // KT2: AppDependencies.server(...) with an HTTP adapter for both ports.
@@ -26,7 +25,7 @@ final class AppDependencies {
     Duration latency = const Duration(milliseconds: 700),
   }) {
     final fake = FakeTicketing(clock: clock, latency: latency);
-    return AppDependencies(clock: clock, visitor: ana, events: fake, tickets: fake, newId: fake.newId, fake: fake);
+    return AppDependencies(clock: clock, visitor: ana, events: fake, tickets: fake, fake: fake);
   }
 
   final Clock clock;

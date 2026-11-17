@@ -58,7 +58,7 @@ void main() {
           ),
         ],
       );
-      final listings = await GetUpcomingEvents(events: store, tickets: store, clock: clock)();
+      final listings = await GetUpcomingEvents(events: store, clock: clock)();
       expect(listings, [EventListing(event: tomorrow, remaining: 10), EventListing(event: nextWeek, remaining: 8)]);
     });
   });
@@ -135,12 +135,9 @@ void main() {
   });
 
   group('ReserveTickets', () {
-    var ids = 0;
-    TicketId newId() => TicketId('n-${++ids}');
-
     test('saves the new tickets', () async {
       final store = InMemoryTicketing(events: [nextWeek]);
-      final reserve = ReserveTickets(events: store, tickets: store, clock: clock, newId: newId);
+      final reserve = ReserveTickets(events: store, tickets: store, clock: clock);
       final result = await reserve(eventId: nextWeek.id, by: ana, quantity: 2);
       expect(result, isA<Success<List<Ticket>>>());
       expect(await store.ticketsOf(ana.id), result.valueOrNull);
@@ -149,7 +146,7 @@ void main() {
 
     test('returns NotFound for an unknown event', () async {
       final store = InMemoryTicketing();
-      final reserve = ReserveTickets(events: store, tickets: store, clock: clock, newId: newId);
+      final reserve = ReserveTickets(events: store, tickets: store, clock: clock);
       final result = await reserve(eventId: const EventId('nope'), by: ana, quantity: 1);
       expect(result, const Failure<List<Ticket>>(NotFound()));
     });
@@ -159,14 +156,48 @@ void main() {
     test('saves the paid ticket', () async {
       final reservedTicket = ticket(status: Reserved(expiresAt: now.add(reservationHold)));
       final store = InMemoryTicketing(events: [nextWeek], tickets: [reservedTicket]);
-      final result = await PayTicket(tickets: store, clock: clock)(id: reservedTicket.id, by: ana);
+      final result = await PayTicket(events: store, tickets: store, clock: clock)(id: reservedTicket.id, by: ana);
       expect(result.valueOrNull?.status, Paid(paidAt: now));
       expect((await store.findTicket(reservedTicket.id))?.status, Paid(paidAt: now));
     });
 
     test('returns NotFound for an unknown ticket', () async {
       final store = InMemoryTicketing();
-      final result = await PayTicket(tickets: store, clock: clock)(id: const TicketId('nope'), by: ana);
+      final result = await PayTicket(events: store, tickets: store, clock: clock)(id: const TicketId('nope'), by: ana);
+      expect(result, const Failure<Ticket>(NotFound()));
+    });
+
+    test('charges the price of the event before saving', () async {
+      final reservedTicket = ticket(status: Reserved(expiresAt: now.add(reservationHold)));
+      final store = InMemoryTicketing(events: [nextWeek], tickets: [reservedTicket]);
+      final gateway = RecordingGateway();
+
+      await PayTicket(events: store, tickets: store, clock: clock, payments: gateway)(id: reservedTicket.id, by: ana);
+
+      expect(gateway.charges, [(reservedTicket.id, nextWeek.priceRsd)]);
+    });
+
+    test('charges nothing when the rule refuses', () async {
+      final stale = ticket(status: Reserved(expiresAt: now.subtract(const Duration(minutes: 1))));
+      final store = InMemoryTicketing(events: [nextWeek], tickets: [stale]);
+      final gateway = RecordingGateway();
+
+      final result = await PayTicket(events: store, tickets: store, clock: clock, payments: gateway)(
+        id: stale.id,
+        by: ana,
+      );
+
+      expect(result, const Failure<Ticket>(ReservationExpired()));
+      expect(gateway.charges, isEmpty);
+    });
+
+    test("returns NotFound for someone else's ticket", () async {
+      final markos = ticket(
+        status: Reserved(expiresAt: now.add(reservationHold)),
+        holder: marko,
+      );
+      final store = InMemoryTicketing(events: [nextWeek], tickets: [markos]);
+      final result = await PayTicket(events: store, tickets: store, clock: clock)(id: markos.id, by: ana);
       expect(result, const Failure<Ticket>(NotFound()));
     });
   });
@@ -190,5 +221,23 @@ void main() {
       expect(result, const Failure<Ticket>(CancellationTooLate(notice: Duration(hours: 24))));
       expect(await store.findTicket(paidTicket.id), paidTicket);
     });
+
+    test("returns NotFound for someone else's ticket, so it does not reveal that the ticket exists", () async {
+      final markos = ticket(
+        status: Paid(paidAt: now),
+        holder: marko,
+      );
+      final store = InMemoryTicketing(events: [nextWeek], tickets: [markos]);
+      final result = await CancelTicket(events: store, tickets: store, clock: clock)(id: markos.id, by: ana);
+      expect(result, const Failure<Ticket>(NotFound()));
+      expect(await store.findTicket(markos.id), markos);
+    });
   });
+}
+
+final class RecordingGateway implements PaymentGateway {
+  final charges = <(TicketId, int)>[];
+
+  @override
+  Future<void> charge({required TicketId ticketId, required int amountRsd}) async => charges.add((ticketId, amountRsd));
 }

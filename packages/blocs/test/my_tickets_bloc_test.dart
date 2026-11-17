@@ -20,7 +20,7 @@ void main() {
 
   MyTicketsBloc build(FakeTicketing store) => MyTicketsBloc(
     getMyTickets: GetMyTickets(events: store, tickets: store, clock: clock),
-    payTicket: PayTicket(tickets: store, clock: clock),
+    payTicket: PayTicket(events: store, tickets: store, clock: clock),
     cancelTicket: CancelTicket(events: store, tickets: store, clock: clock),
     visitor: ana,
     clock: clock,

@@ -1,5 +1,6 @@
 export 'src/admit_ticket.dart';
 export 'src/cancel_ticket.dart';
+export 'src/change_ticket.dart';
 export 'src/clock.dart';
 export 'src/confirm_payment.dart';
 export 'src/get_event_tickets.dart';
@@ -9,6 +10,7 @@ export 'src/get_purchase_context.dart';
 export 'src/get_upcoming_events.dart';
 export 'src/pay_ticket.dart';
 export 'src/ports/event_repository.dart';
+export 'src/ports/payment_gateway.dart';
 export 'src/ports/ticket_repository.dart';
 export 'src/read_models.dart';
 export 'src/repository_exception.dart';

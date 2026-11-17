@@ -7,6 +7,16 @@ abstract interface class TicketRepository {
 
   Future<Ticket?> findTicket(TicketId id);
 
-  /// Stores new or changed tickets and returns them as stored.
-  Future<List<Ticket>> saveAll(List<Ticket> tickets);
+  /// Runs reserveTickets over the stored tickets of the event and stores the new ones, as one step for every caller
+  /// at once. The seats depend on other visitors, so only the store that sees every ticket can decide.
+  Future<Result<List<Ticket>>> reserve({
+    required EventId eventId,
+    required User by,
+    required int quantity,
+    required DateTime now,
+  });
+
+  /// Stores [ticket] only if the stored status is still of the same kind as [from];
+  /// otherwise fails with InvalidTransition from the stored status.
+  Future<Result<Ticket>> save(Ticket ticket, {required TicketStatus from});
 }

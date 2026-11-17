@@ -14,16 +14,13 @@ final class FakeTicketing implements EventRepository, TicketRepository {
   final InMemoryTicketing _store;
   int failingRequests = 0;
   int emptyResponses = 0;
-  int _nextId = 1;
-
-  TicketId newId() => TicketId('t-${_nextId++}');
 
   /// Lists and writes pay the latency; lookups by id are answered from the same round trip.
   Future<void> _roundTrip({bool slow = true}) async {
     if (slow) await Future<void>.delayed(latency);
     if (failingRequests > 0) {
       failingRequests--;
-      throw const RepositoryException('Simulated outage');
+      throw const RepositoryException('Simulated outage', failure: RepositoryFailure.unreachable);
     }
   }
 
@@ -66,8 +63,25 @@ final class FakeTicketing implements EventRepository, TicketRepository {
   }
 
   @override
-  Future<List<Ticket>> saveAll(List<Ticket> tickets) async {
+  Future<int> remainingSeats(EventId id, {required DateTime now}) async {
+    await _roundTrip(slow: false);
+    return _store.remainingSeats(id, now: now);
+  }
+
+  @override
+  Future<Result<List<Ticket>>> reserve({
+    required EventId eventId,
+    required User by,
+    required int quantity,
+    required DateTime now,
+  }) async {
     await _roundTrip();
-    return _store.saveAll(tickets);
+    return _store.reserve(eventId: eventId, by: by, quantity: quantity, now: now);
+  }
+
+  @override
+  Future<Result<Ticket>> save(Ticket ticket, {required TicketStatus from}) async {
+    await _roundTrip();
+    return _store.save(ticket, from: from);
   }
 }

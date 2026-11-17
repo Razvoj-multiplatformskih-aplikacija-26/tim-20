@@ -9,7 +9,7 @@ import 'fake_ticketing.dart';
 void main() {
   final nextWeek = event('e-1', startsIn: const Duration(days: 7));
 
-  EventsBloc build(FakeTicketing store) => EventsBloc(GetUpcomingEvents(events: store, tickets: store, clock: clock));
+  EventsBloc build(FakeTicketing store) => EventsBloc(GetUpcomingEvents(events: store, clock: clock));
 
   blocTest<EventsBloc, EventsState>(
     'requested emits loading, then the events with their free seats',

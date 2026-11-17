@@ -1,6 +1,6 @@
 import 'package:domain/domain.dart';
-import 'package:domain/domain.dart' as domain;
 
+import 'change_ticket.dart';
 import 'clock.dart';
 import 'ports/ticket_repository.dart';
 
@@ -10,12 +10,10 @@ final class ConfirmPayment {
   final TicketRepository tickets;
   final Clock clock;
 
-  Future<Result<Ticket>> call({required TicketId id, required User by}) async {
-    final ticket = await tickets.findTicket(id);
-    if (ticket == null) return const Failure(NotFound());
-    return switch (domain.confirmPayment(ticket, by: by, now: clock.now())) {
-      Failure(:final error) => Failure(error),
-      Success(:final value) => Success((await tickets.saveAll([value])).single),
-    };
-  }
+  Future<Result<Ticket>> call({required TicketId id, required User by}) => changeTicket(
+    tickets,
+    id,
+    by: by,
+    change: (ticket) => confirmPayment(ticket, by: by, now: clock.now()),
+  );
 }

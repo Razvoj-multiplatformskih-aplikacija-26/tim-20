@@ -353,7 +353,10 @@ void main() {
       act: (bloc) async {
         await loaded(bloc, selectedId: paid.id);
         bloc.add(const TicketStatusFilterChanged(StatusFilter.paid));
-        await store.saveAll([reserved.copyWith(status: Paid(paidAt: now))]);
+        await store.save(
+          reserved.copyWith(status: Paid(paidAt: now)),
+          from: reserved.status,
+        );
         bloc.add(const EventTicketsRefreshed());
       },
       skip: 3,

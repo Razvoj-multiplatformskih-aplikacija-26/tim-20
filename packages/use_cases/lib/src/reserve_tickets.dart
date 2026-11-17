@@ -5,28 +5,16 @@ import 'ports/event_repository.dart';
 import 'ports/ticket_repository.dart';
 
 final class ReserveTickets {
-  const ReserveTickets({required this.events, required this.tickets, required this.clock, required this.newId});
+  const ReserveTickets({required this.events, required this.tickets, required this.clock});
 
   final EventRepository events;
   final TicketRepository tickets;
   final Clock clock;
-  final TicketId Function() newId;
 
+  /// The store runs reserveTickets, because the free seats depend on the tickets of every visitor.
   Future<Result<List<Ticket>>> call({required EventId eventId, required User by, required int quantity}) async {
     final event = await events.findEvent(eventId);
     if (event == null) return const Failure(NotFound());
-
-    final result = reserveTickets(
-      event: event,
-      ticketsOfEvent: await tickets.ticketsFor(eventId),
-      by: by,
-      quantity: quantity,
-      now: clock.now(),
-      newId: newId,
-    );
-    return switch (result) {
-      Success(:final value) => Success(await tickets.saveAll(value)),
-      Failure(:final error) => Failure(error),
-    };
+    return tickets.reserve(eventId: eventId, by: by, quantity: quantity, now: clock.now());
   }
 }
