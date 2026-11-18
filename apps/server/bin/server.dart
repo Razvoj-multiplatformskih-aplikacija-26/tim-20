@@ -1,16 +1,20 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:postgres/postgres.dart';
 import 'package:relic/relic.dart' show IOAdapter, RelicServer;
 import 'package:server/server.dart';
 
 Future<void> main() async {
   final config = ServerConfig.fromEnvironment(serverEnvironment());
+  final database = Pool<void>.withUrl(config.databaseUrl);
+  await seedDemoData(database, now: DateTime.now(), demoPassword: config.demoPassword);
   final server = RelicServer(() => IOAdapter.bind(InternetAddress(config.host), port: config.port));
   await server.mountAndStart(buildHandler(corsOrigins: config.corsOrigins));
   stdout.writeln('Ticketing server on http://${config.host}:${config.port}');
   await _stopSignal();
   await server.close();
+  await database.close();
 }
 
 Future<void> _stopSignal() async {
