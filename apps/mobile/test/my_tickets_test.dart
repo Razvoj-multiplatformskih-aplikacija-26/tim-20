@@ -17,6 +17,7 @@ void main() {
     dependencies.fake!.failingRequests = 1;
     await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Moje karte')));
     await tester.pump();
+    await tester.pump();
     expect(find.byType(LoadingView), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 2));

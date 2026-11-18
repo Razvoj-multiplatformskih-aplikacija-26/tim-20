@@ -42,9 +42,8 @@ class _MobileAppState extends State<MobileApp> {
               getMyTickets: dependencies.getMyTickets,
               payTicket: dependencies.payTicket,
               cancelTicket: dependencies.cancelTicket,
-              visitor: dependencies.visitor,
               clock: dependencies.clock,
-            )..add(const MyTicketsRequested()),
+            )..add(MyTicketsVisitorChanged(dependencies.visitor)),
           ),
         ],
         child: MaterialApp.router(

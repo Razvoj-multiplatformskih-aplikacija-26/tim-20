@@ -4,6 +4,13 @@ sealed class MyTicketsEvent {
   const MyTicketsEvent();
 }
 
+/// The session changed: a visitor signed in (their tickets load) or out (null).
+final class MyTicketsVisitorChanged extends MyTicketsEvent {
+  const MyTicketsVisitorChanged(this.visitor);
+
+  final User? visitor;
+}
+
 final class MyTicketsRequested extends MyTicketsEvent {
   const MyTicketsRequested();
 }
