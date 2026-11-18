@@ -4,13 +4,16 @@ import 'dart:io';
 import 'package:postgres/postgres.dart';
 import 'package:relic/relic.dart' show IOAdapter, RelicServer;
 import 'package:server/server.dart';
+import 'package:use_cases/use_cases.dart';
 
 Future<void> main() async {
   final config = ServerConfig.fromEnvironment(serverEnvironment());
   final database = Pool<void>.withUrl(config.databaseUrl);
   await seedDemoData(database, now: DateTime.now(), demoPassword: config.demoPassword);
+  const clock = SystemClock();
+  final handlers = TicketingHandlers(ticketing: PostgresTicketing(database), clock: clock);
   final server = RelicServer(() => IOAdapter.bind(InternetAddress(config.host), port: config.port));
-  await server.mountAndStart(buildHandler(corsOrigins: config.corsOrigins));
+  await server.mountAndStart(buildHandler(handlers, corsOrigins: config.corsOrigins));
   stdout.writeln('Ticketing server on http://${config.host}:${config.port}');
   await _stopSignal();
   await server.close();
