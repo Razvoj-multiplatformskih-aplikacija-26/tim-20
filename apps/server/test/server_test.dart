@@ -137,4 +137,56 @@ void main() {
     expect((await get('/api/v1/nothing')).statusCode, 404);
     expect((await http.post(base.replace(path: ApiPaths.events))).statusCode, 405);
   });
+
+  test('ana signs in and the session names her', () async {
+    final answer = await signIn('ana');
+
+    expect(answer.statusCode, 201);
+    final session = SessionDto.fromJson(jsonDecode(answer.body) as Map<String, Object?>);
+    expect(session.user.role, UserDto.visitor);
+    final current = await get(ApiPaths.currentSession, token: session.token);
+    expect(current.statusCode, 200);
+    expect(SessionDto.fromJson(jsonDecode(current.body) as Map<String, Object?>).user.id, 'u-ana');
+  });
+
+  test('a wrong password and an unknown login are both 401 invalid-credentials', () async {
+    final answers = [await signIn('ana', password: 'pogresna'), await signIn('niko')];
+
+    expect(answers.map((answer) => answer.statusCode), [401, 401]);
+    expect(answers.map(codeOf), everyElement(ErrorCodes.invalidCredentials));
+  });
+
+  test('without a token the server asks to sign in', () async {
+    final answer = await get(ApiPaths.currentSession);
+
+    expect(answer.statusCode, 401);
+    expect(codeOf(answer), ErrorCodes.signInRequired);
+  });
+
+  test('a forged, foreign or expired token is 401 session-expired', () async {
+    final tokens = [
+      'lazni.token.ovde',
+      tokenFor('u-ana', 'visitor', secret: 'another-secret-that-is-long-enough-0123456789'),
+      tokenFor('u-ana', 'visitor', secret: jwtSecret, expiresIn: const Duration(minutes: -1)),
+      JWT(
+        const {'name': 'Ana', 'role': 'visitor'},
+        subject: 'u-ana',
+      ).sign(SecretKey(jwtSecret), algorithm: JWTAlgorithm.HS512, expiresIn: const Duration(hours: 1)),
+    ];
+
+    final answers = [for (final token in tokens) await get(ApiPaths.currentSession, token: token)];
+
+    expect(answers.map((answer) => answer.statusCode), everyElement(401));
+    expect(answers.map(codeOf), everyElement(ErrorCodes.sessionExpired));
+    expect(answers.first.headers['www-authenticate'], 'Bearer');
+  });
+
+  test('passwords are stored only as Argon2id hashes', () async {
+    final rows = await database.execute('SELECT password_hash FROM users WHERE login IS NOT NULL');
+
+    expect(rows, hasLength(4));
+    for (final row in rows) {
+      expect(row[0], startsWith(r'$argon2id$'));
+    }
+  });
 }
