@@ -10,6 +10,7 @@ final class ServerConfig {
     this.secureCookie = false,
     this.demoPassword,
     required this.jwtSecret,
+    required this.paymentApiKey,
   });
 
   factory ServerConfig.fromEnvironment(Map<String, String> environment) => ServerConfig(
@@ -26,6 +27,9 @@ final class ServerConfig {
     secureCookie: environment['COOKIE_SECURE'] == 'true',
     demoPassword: environment['DEMO_PASSWORD'],
     jwtSecret: _jwtSecret(environment['JWT_SECRET']),
+    paymentApiKey:
+        environment['PAYMENT_API_KEY'] ??
+        (throw StateError('PAYMENT_API_KEY is not set. Copy .env.example to .env in the repository root.')),
   );
 
   final String host;
@@ -36,6 +40,7 @@ final class ServerConfig {
   final bool secureCookie;
   final String? demoPassword;
   final String jwtSecret;
+  final String paymentApiKey;
 }
 
 String _jwtSecret(String? secret) => switch (secret) {

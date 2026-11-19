@@ -10,6 +10,7 @@ void main() {
       'DEMO_PASSWORD': 'tim20-demo',
       'JWT_SECRET': 'dev-only-secret-change-me-0123456789abcdef',
       'SESSION_TTL_MINUTES': '1',
+      'PAYMENT_API_KEY': 'dev-only-fake-payment-key',
     });
 
     expect(config.host, '0.0.0.0');
@@ -24,9 +25,24 @@ void main() {
     expect(() => ServerConfig.fromEnvironment(const {}), throwsStateError);
   });
 
+  test('the payment key stays on the server and must be set', () {
+    expect(
+      () => ServerConfig.fromEnvironment(const {
+        'DATABASE_URL': 'postgres://db/tim20',
+        'JWT_SECRET': 'dev-only-secret-change-me-0123456789abcdef',
+      }),
+      throwsStateError,
+    );
+    expect(() => FakePaymentGateway(apiKey: ''), throwsStateError);
+  });
+
   test('a token secret shorter than 32 bytes is refused', () {
     expect(
-      () => ServerConfig.fromEnvironment(const {'DATABASE_URL': 'postgres://db/tim20', 'JWT_SECRET': 'too-short'}),
+      () => ServerConfig.fromEnvironment(const {
+        'DATABASE_URL': 'postgres://db/tim20',
+        'JWT_SECRET': 'too-short',
+        'PAYMENT_API_KEY': 'dev-only-fake-payment-key',
+      }),
       throwsStateError,
     );
   });

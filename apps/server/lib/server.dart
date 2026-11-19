@@ -2,6 +2,7 @@ export 'src/account_store.dart';
 export 'src/app.dart';
 export 'src/config.dart';
 export 'src/env_file.dart';
+export 'src/fake_payment_gateway.dart';
 export 'src/handlers.dart';
 export 'src/postgres_ticketing.dart';
 export 'src/seed.dart';
