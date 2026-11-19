@@ -1,6 +1,7 @@
 import 'package:domain/domain.dart';
 import 'package:postgres/postgres.dart';
 
+import 'passwords.dart';
 import 'ticketing_store.dart';
 
 const _ana = User(id: UserId('u-ana'), name: 'Ana Anić', role: Role.visitor);
@@ -17,12 +18,15 @@ const _logins = {'u-ana': 'ana', 'u-marko': 'marko', 'u-org': 'organizator', 'u-
 /// Fills an empty database with demo data whose times are relative to [now], so the demo works on any day.
 Future<void> seedDemoData(Pool<void> database, {required DateTime now, required String? demoPassword}) async {
   if (!await TicketingStore(database).isEmpty()) return;
-  await database.runTx((session) => _seed(TicketingStore(session), now: now.toUtc()));
+  if (demoPassword == null) throw StateError('DEMO_PASSWORD is not set. Copy .env.example to .env.');
+  final passwordHash = await hashPassword(demoPassword);
+  await database.runTx((session) => _seed(TicketingStore(session), now: now.toUtc(), passwordHash: passwordHash));
 }
 
-Future<void> _seed(TicketingStore store, {required DateTime now}) async {
+Future<void> _seed(TicketingStore store, {required DateTime now, required String passwordHash}) async {
   for (final user in [_ana, _marko, _organizer, _usher, _jelena, _nikola, _milica, _stefan]) {
-    await store.insertUser(user, login: _logins[user.id.value]);
+    final login = _logins[user.id.value];
+    await store.insertUser(user, login: login, passwordHash: login == null ? null : passwordHash);
   }
 
   DateTime day(int days, int hour) => DateTime.utc(now.year, now.month, now.day + days, hour);
