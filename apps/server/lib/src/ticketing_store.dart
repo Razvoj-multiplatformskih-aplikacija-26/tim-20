@@ -50,6 +50,13 @@ final class TicketingStore {
     return found.isEmpty ? null : found.single;
   }
 
+  /// Locks the row of the event until the transaction ends, so a second reservation for it waits and then sees
+  /// the tickets the first one stored.
+  Future<Event?> lockEvent(EventId id) async {
+    final found = await _events('id = @id', {'id': id.value}, lock: true);
+    return found.isEmpty ? null : found.single;
+  }
+
   Future<void> insertTicket(Ticket ticket) {
     final columns = _statusColumns(ticket.status);
     return _database.execute(
@@ -75,6 +82,29 @@ final class TicketingStore {
     );
   }
 
+  /// Stores the new status only if the stored one is still [from]; false when another call changed it first.
+  Future<bool> changeStatus(Ticket changed, {required TicketStatus from}) async {
+    final columns = _statusColumns(changed.status);
+    final result = await _database.execute(
+      Sql.named('''
+        UPDATE tickets
+        SET status = @status, expires_at = @expiresAt, status_at = @statusAt, status_by = @statusBy,
+            cancel_reason = @reason
+        WHERE id = @id AND status = @previous
+      '''),
+      parameters: {
+        'id': changed.id.value,
+        'status': columns.kind,
+        'expiresAt': columns.expiresAt,
+        'statusAt': columns.at,
+        'statusBy': columns.by,
+        'reason': columns.reason,
+        'previous': _statusColumns(from).kind,
+      },
+    );
+    return result.affectedRows == 1;
+  }
+
   Future<List<Ticket>> ticketsOfEvent(EventId id) => _tickets('event_id = @id', {'id': id.value});
 
   Future<List<Ticket>> ticketsOf(UserId holder) => _tickets('holder_id = @holder', {'holder': holder.value});
@@ -84,13 +114,14 @@ final class TicketingStore {
     return found.isEmpty ? null : found.single;
   }
 
-  Future<List<Event>> _events(String where, Map<String, Object?> parameters) async {
+  Future<List<Event>> _events(String where, Map<String, Object?> parameters, {bool lock = false}) async {
     final rows = await _database.execute(
       Sql.named('''
         SELECT id, name, venue, starts_at, price_rsd, capacity, organizer_id
         FROM events
         WHERE $where
         ORDER BY starts_at, id
+        ${lock ? 'FOR UPDATE' : ''}
       '''),
       parameters: parameters,
     );
