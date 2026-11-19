@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:api_contract/api_contract.dart';
+import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:http/http.dart' as http;
 import 'package:postgres/postgres.dart';
 import 'package:relic/relic.dart' show IOAdapter, RelicServer;
@@ -15,6 +16,10 @@ import 'package:use_cases/use_cases.dart';
 late Pool<void> database;
 late RelicServer server;
 late Uri base;
+late String demoPassword;
+late String jwtSecret;
+
+const browser = 'http://localhost:8081';
 
 Future<void> migrateWithDbmate(Uri databaseUrl) async {
   final insideCompose = databaseUrl.replace(host: 'db', port: 5432, path: '/tim20_test');
@@ -29,13 +34,32 @@ Future<void> migrateWithDbmate(Uri databaseUrl) async {
   if (result.exitCode != 0) throw StateError('dbmate failed: ${result.stderr}');
 }
 
-Future<http.Response> get(String path) => http.get(base.replace(path: path));
+Future<http.Response> get(String path, {String? token}) =>
+    http.get(base.replace(path: path), headers: {'Authorization': ?bearer(token)});
+
+String? bearer(String? token) => token == null ? null : 'Bearer $token';
+
+Map<String, String> as(String token) => {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'};
+
+Future<http.Response> signIn(String login, {String? password, bool cookie = false}) => http.post(
+  base.replace(path: ApiPaths.sessions),
+  headers: {'Content-Type': 'application/json'},
+  body: jsonEncode(LoginDto(username: login, password: password ?? demoPassword, cookie: cookie).toJson()),
+);
+
+Future<String> logIn(String login) async =>
+    SessionDto.fromJson(jsonDecode((await signIn(login)).body) as Map<String, Object?>).token!;
+
+String tokenFor(String userId, String role, {required String secret, Duration expiresIn = const Duration(hours: 1)}) =>
+    JWT({'name': userId, 'role': role}, subject: userId).sign(SecretKey(secret), expiresIn: expiresIn);
 
 String codeOf(http.Response response) => (jsonDecode(response.body) as Map<String, Object?>)['code']! as String;
 
 void main() {
   setUpAll(() async {
     final config = ServerConfig.fromEnvironment(serverEnvironment());
+    demoPassword = config.demoPassword!;
+    jwtSecret = config.jwtSecret;
     final admin = Pool<void>.withUrl(config.databaseUrl);
     await admin.execute('DROP DATABASE IF EXISTS tim20_test WITH (FORCE)');
     await admin.execute('CREATE DATABASE tim20_test');
@@ -46,7 +70,12 @@ void main() {
     const clock = SystemClock();
     final handlers = TicketingHandlers(ticketing: PostgresTicketing(database), clock: clock);
     server = RelicServer(() => IOAdapter.bind(InternetAddress.loopbackIPv4, port: 0));
-    await server.mountAndStart(buildHandler(handlers, corsOrigins: const []));
+    final sessions = SessionHandlers(
+      accounts: AccountStore(database),
+      secret: jwtSecret,
+      ttl: const Duration(hours: 1),
+    );
+    await server.mountAndStart(buildHandler(handlers, sessions, corsOrigins: const [browser]));
     base = Uri.parse('http://localhost:${server.port}');
   });
 
