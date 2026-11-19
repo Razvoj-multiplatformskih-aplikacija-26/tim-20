@@ -1,3 +1,4 @@
+import 'package:api_client/api_client.dart';
 import 'package:domain/domain.dart';
 import 'package:use_cases/testing.dart';
 import 'package:use_cases/use_cases.dart';
@@ -24,6 +25,20 @@ final class AppDependencies {
        logOut = LogOut(sessions: sessions),
        sessionExpirations = sessions.expirations;
 
+  /// The same ports over HTTP; the session token lives in [tokens], never in the app.
+  factory AppDependencies.server({
+    required Uri baseUri,
+    required TokenStore tokens,
+    Clock clock = const SystemClock(),
+  }) {
+    final api = ApiClient(baseUri: baseUri, tokens: tokens);
+    return AppDependencies(
+      clock: clock,
+      events: HttpEventRepository(api),
+      tickets: HttpTicketRepository(api),
+      sessions: HttpSessionRepository(api),
+    );
+  }
 
   factory AppDependencies.fake({
     Clock clock = const SystemClock(),
