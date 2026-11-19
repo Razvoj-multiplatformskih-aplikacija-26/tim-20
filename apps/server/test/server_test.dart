@@ -286,4 +286,91 @@ void main() {
     expect(answers.map((answer) => answer.statusCode), unorderedEquals([200, 409]));
     expect(codeOf(answers.firstWhere((answer) => answer.statusCode == 409)), ErrorCodes.ticketAlreadyUsed);
   });
+
+  test('a visitor may not confirm a payment or admit a ticket, even their own', () async {
+    final ana = await logIn('ana');
+
+    final answers = [await act(ana, ApiPaths.paymentConfirmation('t-01')), await act(ana, ApiPaths.admission('t-02'))];
+
+    expect(answers.map((answer) => answer.statusCode), [403, 403]);
+    expect(answers.map(codeOf), everyElement(ErrorCodes.notAllowed));
+  });
+
+  test("a visitor neither sees nor cancels someone else's ticket", () async {
+    final ana = await logIn('ana');
+
+    final seen = await get(ApiPaths.ticket('t-28'), token: ana);
+    final cancelled = await act(ana, ApiPaths.cancellation('t-28'), body: const CancellationDto().toJson());
+
+    expect([seen.statusCode, cancelled.statusCode], [404, 404]);
+    expect(codeOf(cancelled), ErrorCodes.notFound);
+  });
+
+  test('a visitor cancelling within 24 hours gets 422 cancellation-too-late, the organizer may void', () async {
+    final late = await act(await logIn('ana'), ApiPaths.cancellation('t-04'), body: const CancellationDto().toJson());
+    final voided = await act(
+      await logIn('organizator'),
+      ApiPaths.cancellation('t-18'),
+      body: const CancellationDto(reason: 'Duplikat.').toJson(),
+    );
+
+    expect(late.statusCode, 422);
+    expect(codeOf(late), ErrorCodes.cancellationTooLate);
+    expect(problemOf(late)['min'], 1440);
+    expect(voided.statusCode, 200);
+    expect(TicketDto.fromJson(problemOf(voided)).status.kind, TicketStatusDto.cancelled);
+  });
+
+  test('five tickets at once are 422 invalid-ticket-quantity with the limits of the rule', () async {
+    final answer = await reserve(await logIn('ana'), 'e-1', 5);
+
+    expect(answer.statusCode, 422);
+    expect(codeOf(answer), ErrorCodes.invalidTicketQuantity);
+    expect([problemOf(answer)['min'], problemOf(answer)['max']], [1, 4]);
+  });
+
+  test('paying a reservation past its deadline is 409 reservation-expired', () async {
+    final answer = await act(await logIn('marko'), ApiPaths.payment('t-05'));
+
+    expect(answer.statusCode, 409);
+    expect(codeOf(answer), ErrorCodes.reservationExpired);
+  });
+
+  test('ana pays her reservation through the fake gateway', () async {
+    final answer = await act(await logIn('ana'), ApiPaths.payment('t-01'));
+
+    expect(answer.statusCode, 200);
+    expect(TicketDto.fromJson(problemOf(answer)).status.kind, TicketStatusDto.paid);
+  });
+
+  test('a visitor reads only their own tickets and never the tickets of an event', () async {
+    final ana = await logIn('ana');
+
+    final own = await get(ApiPaths.ticketsOfUser('u-ana'), token: ana);
+    final others = await get(ApiPaths.ticketsOfUser('u-marko'), token: ana);
+    final event = await get(ApiPaths.eventTickets('e-1'), token: ana);
+
+    expect((jsonDecode(own.body) as List<Object?>), isNotEmpty);
+    expect(jsonDecode(others.body), isEmpty);
+    expect(event.statusCode, 403);
+    expect(codeOf(event), ErrorCodes.notAllowed);
+  });
+
+  test('the usher sees the tickets of every event', () async {
+    final answer = await get(ApiPaths.eventTickets('e-1'), token: await logIn('redar'));
+
+    expect(answer.statusCode, 200);
+    expect((jsonDecode(answer.body) as List<Object?>).length, greaterThanOrEqualTo(10));
+  });
+
+  test('a reservation without a token is 401 sign-in-required', () async {
+    final answer = await http.post(
+      base.replace(path: ApiPaths.reservations('e-1')),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(const NewReservationDto(quantity: 1).toJson()),
+    );
+
+    expect(answer.statusCode, 401);
+    expect(codeOf(answer), ErrorCodes.signInRequired);
+  });
 }
