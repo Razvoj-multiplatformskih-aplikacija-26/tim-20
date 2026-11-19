@@ -14,10 +14,15 @@ void main() {
     await tester.pumpWidget(appWith(dependencies));
     await tester.pump(const Duration(seconds: 2));
 
-    dependencies.fake!.failingRequests = 1;
     await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Moje karte')));
-    await tester.pump();
-    await tester.pump();
+    await settle(tester);
+    expect(find.byType(StatusBadge), findsWidgets);
+
+    dependencies.fake!.failingRequests = 1;
+    await tester.fling(find.byType(StatusBadge).first, const Offset(0, 400), 1000);
+    for (var i = 0; i < 3; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
     expect(find.byType(LoadingView), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 2));

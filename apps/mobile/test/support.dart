@@ -1,14 +1,20 @@
+import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/app.dart';
+import 'package:mobile/data/seed.dart';
 import 'package:mobile/dependencies.dart';
 import 'package:use_cases/use_cases.dart';
 
 /// Wednesday 4. 11. 2026. at 13:00 in Belgrade; the seed is relative to it.
 final wednesdayNoon = DateTime.utc(2026, 11, 4, 12);
 
-AppDependencies fakeDependencies({DateTime? now, Duration latency = Duration.zero}) =>
-    AppDependencies.fake(clock: FixedClock(now ?? wednesdayNoon), latency: latency);
+AppDependencies fakeDependencies({
+  DateTime? now,
+  Duration latency = Duration.zero,
+  bool signedIn = true,
+  User user = ana,
+}) => AppDependencies.fake(clock: FixedClock(now ?? wednesdayNoon), latency: latency, signedIn: signedIn, user: user);
 
 Widget appWith(AppDependencies dependencies, {String initialLocation = '/'}) =>
     MobileApp(dependencies: dependencies, initialLocation: initialLocation);
