@@ -247,4 +247,43 @@ void main() {
     expect(preflight.headers['access-control-allow-credentials'], 'true');
     expect(foreign.statusCode, 403);
   });
+
+  test('two visitors buying the last seat at once get one 201 and one 409 not-enough-seats', () async {
+    final ana = await logIn('ana');
+    final marko = await logIn('marko');
+
+    final answers = await Future.wait([reserve(ana, 'e-3', 1), reserve(marko, 'e-3', 1)]);
+
+    expect(answers.map((answer) => answer.statusCode), unorderedEquals([201, 409]));
+    final late = answers.firstWhere((answer) => answer.statusCode == 409);
+    expect(codeOf(late), ErrorCodes.notEnoughSeats);
+    expect(problemOf(late)['value'], 0);
+    expect(await activeTickets('e-3'), 5);
+  });
+
+  test('one visitor buying 3 and 3 from two devices at once gets one 201 and one 409 ticket-limit-exceeded', () async {
+    final phone = await logIn('ana');
+    final tablet = await logIn('ana');
+
+    final answers = await Future.wait([reserve(phone, 'e-4', 3), reserve(tablet, 'e-4', 3)]);
+
+    expect(answers.map((answer) => answer.statusCode), unorderedEquals([201, 409]));
+    final late = answers.firstWhere((answer) => answer.statusCode == 409);
+    expect(codeOf(late), ErrorCodes.ticketLimitExceeded);
+    expect(problemOf(late)['max'], 4);
+    expect(await activeTickets('e-4'), 3);
+  });
+
+  test('two admissions of one paid ticket at once give 200 and 409 ticket-already-used', () async {
+    final organizer = await logIn('organizator');
+    final usher = await logIn('redar');
+
+    final answers = await Future.wait([
+      act(organizer, ApiPaths.admission('t-03')),
+      act(usher, ApiPaths.admission('t-03')),
+    ]);
+
+    expect(answers.map((answer) => answer.statusCode), unorderedEquals([200, 409]));
+    expect(codeOf(answers.firstWhere((answer) => answer.statusCode == 409)), ErrorCodes.ticketAlreadyUsed);
+  });
 }
