@@ -181,6 +181,22 @@ void main() {
     expect(answers.first.headers['www-authenticate'], 'Bearer');
   });
 
+  test('a browser sign-in keeps the session in an HttpOnly cookie and signing out clears it', () async {
+    final answer = await signIn('organizator', cookie: true);
+
+    expect(answer.statusCode, 201);
+    expect(SessionDto.fromJson(jsonDecode(answer.body) as Map<String, Object?>).token, isNull);
+    final cookie = answer.headers['set-cookie']!;
+    expect(cookie, allOf(startsWith('${ApiCookies.session}='), contains('HttpOnly'), contains('SameSite=Lax')));
+
+    final session = cookie.split(';').first;
+    final current = await http.get(base.replace(path: ApiPaths.currentSession), headers: {'Cookie': session});
+    expect(current.statusCode, 200);
+    final out = await http.delete(base.replace(path: ApiPaths.currentSession), headers: {'Cookie': session});
+    expect(out.statusCode, 204);
+    expect(out.headers['set-cookie'], contains('Max-Age=0'));
+  });
+
   test('passwords are stored only as Argon2id hashes', () async {
     final rows = await database.execute('SELECT password_hash FROM users WHERE login IS NOT NULL');
 
@@ -188,5 +204,18 @@ void main() {
     for (final row in rows) {
       expect(row[0], startsWith(r'$argon2id$'));
     }
+  });
+
+  test('the browser origin from CORS_ORIGINS passes the preflight and another origin may not write', () async {
+    final request = http.Request('OPTIONS', base.replace(path: ApiPaths.sessions))
+      ..headers['Origin'] = browser
+      ..headers['Access-Control-Request-Method'] = 'POST';
+    final preflight = await http.Response.fromStream(await request.send());
+    final foreign = await http.post(base.replace(path: ApiPaths.sessions), headers: {'Origin': 'http://evil.example'});
+
+    expect(preflight.statusCode, 204);
+    expect(preflight.headers['access-control-allow-origin'], browser);
+    expect(preflight.headers['access-control-allow-credentials'], 'true');
+    expect(foreign.statusCode, 403);
   });
 }
