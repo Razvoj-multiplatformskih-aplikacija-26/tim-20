@@ -50,6 +50,31 @@ Future<http.Response> signIn(String login, {String? password, bool cookie = fals
 Future<String> logIn(String login) async =>
     SessionDto.fromJson(jsonDecode((await signIn(login)).body) as Map<String, Object?>).token!;
 
+Future<http.Response> reserve(String token, String eventId, int quantity) => http.post(
+  base.replace(path: ApiPaths.reservations(eventId)),
+  headers: as(token),
+  body: jsonEncode(NewReservationDto(quantity: quantity).toJson()),
+);
+
+Future<http.Response> act(String token, String path, {Object? body}) => http.post(
+  base.replace(path: path),
+  headers: as(token),
+  body: body == null ? null : jsonEncode(body),
+);
+
+Map<String, Object?> problemOf(http.Response response) => jsonDecode(response.body) as Map<String, Object?>;
+
+Future<int> activeTickets(String eventId) async {
+  final rows = await database.execute(
+    Sql.named('''
+      SELECT count(*) FROM tickets
+      WHERE event_id = @event AND (status IN ('paid', 'used') OR (status = 'reserved' AND expires_at > now()))
+    '''),
+    parameters: {'event': eventId},
+  );
+  return rows.single[0]! as int;
+}
+
 String tokenFor(String userId, String role, {required String secret, Duration expiresIn = const Duration(hours: 1)}) =>
     JWT({'name': userId, 'role': role}, subject: userId).sign(SecretKey(secret), expiresIn: expiresIn);
 
@@ -68,7 +93,11 @@ void main() {
     await migrateWithDbmate(Uri.parse(config.databaseUrl));
     await seedDemoData(database, now: DateTime.now(), demoPassword: config.demoPassword);
     const clock = SystemClock();
-    final handlers = TicketingHandlers(ticketing: PostgresTicketing(database), clock: clock);
+    final handlers = TicketingHandlers(
+      ticketing: PostgresTicketing(database),
+      clock: clock,
+      payments: FakePaymentGateway(apiKey: config.paymentApiKey),
+    );
     server = RelicServer(() => IOAdapter.bind(InternetAddress.loopbackIPv4, port: 0));
     final sessions = SessionHandlers(
       accounts: AccountStore(database),

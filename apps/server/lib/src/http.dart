@@ -33,6 +33,16 @@ Future<Map<String, Object?>> readObject(Request request) async {
   };
 }
 
+Response respond(Result<Ticket> result) => switch (result) {
+  Success(:final value) => json(200, value.toDto().toJson()),
+  Failure(:final error) => problem(error),
+};
+
+Response respondCreated(Result<List<Ticket>> result) => switch (result) {
+  Success(:final value) => json(201, [for (final ticket in value) ticket.toDto().toJson()]),
+  Failure(:final error) => problem(error),
+};
+
 Middleware handleErrors() =>
     (Handler next) => (Request request) async {
       try {

@@ -11,7 +11,11 @@ Future<void> main() async {
   final database = Pool<void>.withUrl(config.databaseUrl);
   await seedDemoData(database, now: DateTime.now(), demoPassword: config.demoPassword);
   const clock = SystemClock();
-  final handlers = TicketingHandlers(ticketing: PostgresTicketing(database), clock: clock);
+  final handlers = TicketingHandlers(
+    ticketing: PostgresTicketing(database),
+    clock: clock,
+    payments: FakePaymentGateway(apiKey: config.paymentApiKey),
+  );
   final server = RelicServer(() => IOAdapter.bind(InternetAddress(config.host), port: config.port));
   final sessions = SessionHandlers(
     accounts: AccountStore(database),
