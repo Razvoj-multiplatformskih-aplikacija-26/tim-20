@@ -29,8 +29,12 @@ jobs:
 
       - name: Keep the shared packages free of Flutter and platform libraries
         run: |
-          if grep -rE "package:flutter|dart:io|dart:ffi|dart:js_interop" packages/domain packages/use_cases packages/blocs; then
+          if grep -rE "package:flutter|dart:io|dart:ffi|dart:js_interop" packages/domain packages/use_cases packages/blocs packages/api_*; then
             echo "::error::a shared package imports Flutter or a platform library"
+            exit 1
+          fi
+          if grep -rE "package:domain|package:use_cases" packages/api_contract; then
+            echo "::error::the contract imports the domain"
             exit 1
           fi
 
@@ -46,10 +50,14 @@ jobs:
             echo "::endgroup::"
           done
 
-      - name: Test the apps
+      - name: Test the apps and the server without a database
         run: |
           for app in apps/*/; do
             echo "::group::${app}"
-            (cd "${app}" && flutter test)
+            if grep -q "sdk: flutter" "${app}pubspec.yaml"; then
+              (cd "${app}" && flutter test)
+            else
+              (cd "${app}" && dart test -x db)
+            fi
             echo "::endgroup::"
           done
