@@ -44,4 +44,23 @@ void main() {
     expect(appBarTitle('Moje karte'), findsOneWidget);
     expect(find.text('Rezervisano je 2 karte. Platite u roku od 15 minuta.'), findsOneWidget);
   });
+
+  testWidgets('a late purchase shows the reason and the fresh number of seats', (tester) async {
+    usePhoneSize(tester);
+    final dependencies = fakeDependencies();
+    await tester.pumpWidget(appWith(dependencies, initialLocation: '/dogadjaj/e-3/kupovina'));
+    await settle(tester);
+    expect(find.textContaining('Još 1 mesto'), findsOneWidget);
+
+    await tester.runAsync(
+      () =>
+          dependencies.fake!.reserve(eventId: const EventId('e-3'), by: otherVisitor, quantity: 1, now: wednesdayNoon),
+    );
+    await tester.tap(find.text('Kupi'));
+    await settle(tester);
+
+    expect(appBarTitle('Kupovina'), findsOneWidget);
+    expect(find.text('Karte su rasprodate.'), findsOneWidget);
+    expect(find.textContaining('Rasprodato'), findsOneWidget);
+  });
 }

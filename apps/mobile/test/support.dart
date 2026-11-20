@@ -11,10 +11,29 @@ final wednesdayNoon = DateTime.utc(2026, 11, 4, 12);
 
 AppDependencies fakeDependencies({
   DateTime? now,
+  Clock? clock,
   Duration latency = Duration.zero,
   bool signedIn = true,
   User user = ana,
-}) => AppDependencies.fake(clock: FixedClock(now ?? wednesdayNoon), latency: latency, signedIn: signedIn, user: user);
+}) => AppDependencies.fake(
+  clock: clock ?? FixedClock(now ?? wednesdayNoon),
+  latency: latency,
+  signedIn: signedIn,
+  user: user,
+);
+
+/// Another visitor who takes the last seats while Ana is still looking at the old number.
+const otherVisitor = User(id: UserId('u-jovan'), name: 'Jovan Jovanović', role: Role.visitor);
+
+/// A clock the test can move forward, to act after a reservation has run out.
+final class MovingClock implements Clock {
+  MovingClock(this.instant);
+
+  DateTime instant;
+
+  @override
+  DateTime now() => instant;
+}
 
 Widget appWith(AppDependencies dependencies, {String initialLocation = '/'}) =>
     MobileApp(dependencies: dependencies, initialLocation: initialLocation);
@@ -32,4 +51,12 @@ Finder appBarTitle(String title) => find.descendant(of: find.byType(AppBar), mat
 Future<void> openTab(WidgetTester tester, String label) async {
   await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text(label)));
   await settle(tester);
+}
+
+/// The indicator waits for its drag animation before it asks for data, so the frames are pumped one by one.
+Future<void> pullToRefresh(WidgetTester tester, Finder from) async {
+  await tester.fling(from, const Offset(0, 400), 1000);
+  for (var i = 0; i < 3; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
 }
