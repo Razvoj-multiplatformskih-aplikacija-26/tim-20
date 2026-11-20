@@ -28,7 +28,10 @@ class TicketDetailScreen extends StatelessWidget {
           appBar: AppBar(title: const Text('Karta')),
           body: switch (state) {
             MyTicketsLoading() => const LoadingView(),
-            MyTicketsFailure() => FailureView(onRetry: () => bloc.add(const MyTicketsRequested())),
+            MyTicketsFailure(:final cause) => FailureView(
+              cause: cause,
+              onRetry: () => bloc.add(const MyTicketsRequested()),
+            ),
             MyTicketsSignedOut() || MyTicketsEmpty() => const EmptyView(title: 'Karta nije pronađena.'),
             MyTicketsLoaded(:final loadedAt) =>
               owned == null ? const EmptyView(title: 'Karta nije pronađena.') : _Details(owned: owned, now: loadedAt),

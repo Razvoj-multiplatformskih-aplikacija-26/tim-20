@@ -24,7 +24,7 @@ class MyTicketsScreen extends StatelessWidget {
       TicketPaid() => 'Karta je plaćena.',
       TicketCancelled() => 'Karta je otkazana.',
       TicketActionRejected(:final error) => error.message,
-      TicketActionFailed() => 'Radnja nije uspela. Pokušajte ponovo.',
+      TicketActionFailed(:final cause) => failureMessage(cause),
     };
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     context.read<MyTicketsBloc>().add(const MyTicketsNoticeAcknowledged());
@@ -58,9 +58,9 @@ class MyTicketsScreen extends StatelessWidget {
               ],
             ),
             MyTicketsLoading() => const LoadingView(),
-            MyTicketsFailure() => ListView(
+            MyTicketsFailure(:final cause) => ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              children: [FailureView(onRetry: () => bloc.add(const MyTicketsRequested()))],
+              children: [FailureView(cause: cause, onRetry: () => bloc.add(const MyTicketsRequested()))],
             ),
             MyTicketsEmpty() => ListView(
               physics: const AlwaysScrollableScrollPhysics(),

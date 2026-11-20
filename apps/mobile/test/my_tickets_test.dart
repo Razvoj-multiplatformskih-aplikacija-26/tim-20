@@ -19,14 +19,11 @@ void main() {
     expect(find.byType(StatusBadge), findsWidgets);
 
     dependencies.fake!.failingRequests = 1;
-    await tester.fling(find.byType(StatusBadge).first, const Offset(0, 400), 1000);
-    for (var i = 0; i < 3; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
+    await pullToRefresh(tester, find.byType(StatusBadge).first);
     expect(find.byType(LoadingView), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 2));
-    expect(find.text('Podaci trenutno nisu dostupni.'), findsOneWidget);
+    expect(find.text('Nema veze sa serverom.'), findsOneWidget);
 
     dependencies.fake!.emptyResponses = 1;
     await tester.tap(find.text('Pokušaj ponovo'));

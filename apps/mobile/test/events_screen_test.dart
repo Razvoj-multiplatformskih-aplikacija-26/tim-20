@@ -15,7 +15,7 @@ void main() {
     expect(find.byType(LoadingView), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 2));
-    expect(find.text('Podaci trenutno nisu dostupni.'), findsOneWidget);
+    expect(find.text('Nema veze sa serverom.'), findsOneWidget);
 
     dependencies.fake!.emptyResponses = 1;
     await tester.tap(find.text('Pokušaj ponovo'));

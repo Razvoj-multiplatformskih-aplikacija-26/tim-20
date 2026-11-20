@@ -30,7 +30,10 @@ class EventDetailScreen extends StatelessWidget {
           appBar: AppBar(title: const Text('Događaj')),
           body: switch (state) {
             EventsLoading() => const LoadingView(),
-            EventsFailure() => FailureView(onRetry: () => context.read<EventsBloc>().add(const EventsRequested())),
+            EventsFailure(:final cause) => FailureView(
+              cause: cause,
+              onRetry: () => context.read<EventsBloc>().add(const EventsRequested()),
+            ),
             EventsEmpty() || EventsLoaded() =>
               listing == null ? const EmptyView(title: 'Događaj nije pronađen.') : _Details(listing: listing),
           },
