@@ -22,7 +22,7 @@ class TicketDetailScreen extends StatelessWidget {
     return BlocBuilder<MyTicketsBloc, MyTicketsState>(
       builder: (context, state) {
         final owned = switch (state) {
-          MyTicketsLoading() || MyTicketsFailure() || MyTicketsEmpty() => null,
+          MyTicketsSignedOut() || MyTicketsLoading() || MyTicketsFailure() || MyTicketsEmpty() => null,
           MyTicketsLoaded() => state.byId(id),
         };
         return Scaffold(
@@ -30,7 +30,7 @@ class TicketDetailScreen extends StatelessWidget {
           body: switch (state) {
             MyTicketsLoading() => const LoadingView(),
             MyTicketsFailure() => FailureView(onRetry: () => bloc.add(const MyTicketsRequested())),
-            MyTicketsEmpty() => const EmptyView(title: 'Karta nije pronađena.'),
+            MyTicketsSignedOut() || MyTicketsEmpty() => const EmptyView(title: 'Karta nije pronađena.'),
             MyTicketsLoaded(:final loadedAt) =>
               owned == null ? const EmptyView(title: 'Karta nije pronađena.') : _Details(owned: owned, now: loadedAt),
           },

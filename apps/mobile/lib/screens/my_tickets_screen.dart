@@ -40,6 +40,10 @@ class MyTicketsScreen extends StatelessWidget {
         builder: (context, state) => RefreshIndicator(
           onRefresh: () => _refresh(bloc),
           child: switch (state) {
+            MyTicketsSignedOut() => ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: const [EmptyView(title: 'Prijavite se da vidite svoje karte')],
+            ),
             MyTicketsLoading() => const LoadingView(),
             MyTicketsFailure() => ListView(
               physics: const AlwaysScrollableScrollPhysics(),

@@ -1,7 +1,10 @@
+import 'package:blocs/blocs.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ui/ui.dart';
+import 'package:use_cases/testing.dart';
+import 'package:use_cases/use_cases.dart';
 
 void main() {
   final t = DateTime.utc(2026, 11, 4, 12);
@@ -62,7 +65,38 @@ void main() {
     });
   });
 
+  group('failureMessage', () {
+    test('explains every kind of failure without technical text', () {
+      const messages = {
+        RepositoryFailure.unavailable: 'Podaci trenutno nisu dostupni.',
+        RepositoryFailure.unreachable: serverUnreachableMessage,
+        RepositoryFailure.serverError: 'Greška na serveru.',
+        RepositoryFailure.refused: 'Server nije prihvatio zahtev.',
+        RepositoryFailure.sessionExpired: sessionExpiredMessage,
+      };
+      for (final MapEntry(key: failure, value: message) in messages.entries) {
+        expect(failureMessage(RepositoryException('x', failure: failure)), message);
+      }
+      expect(failureMessage(StateError('x')), 'Podaci trenutno nisu dostupni.');
+      expect(failureMessage(null), 'Podaci trenutno nisu dostupni.');
+    });
+  });
+
   group('FailureView', () {
+    testWidgets('says the server is unreachable and offers a retry', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: TicketsTheme.light(),
+          home: FailureView(
+            onRetry: () {},
+            cause: const RepositoryException('x', failure: RepositoryFailure.unreachable),
+          ),
+        ),
+      );
+      expect(find.text('Nema veze sa serverom.'), findsOneWidget);
+      expect(find.text('Pokušaj ponovo'), findsOneWidget);
+    });
+
     testWidgets('calls onRetry on Pokušaj ponovo', (tester) async {
       var retried = 0;
       await tester.pumpWidget(
@@ -73,6 +107,48 @@ void main() {
       );
       await tester.tap(find.text('Pokušaj ponovo'));
       expect(retried, 1);
+    });
+  });
+
+  group('LoginScreen', () {
+    const ana = User(id: UserId('u-ana'), name: 'Ana Anić', role: Role.visitor);
+
+    Widget screen({SignOutReason? reason, void Function(User)? onSignedIn, bool signedIn = false}) => MaterialApp(
+      theme: TicketsTheme.light(),
+      home: LoginScreen(
+        title: 'Ulaznice',
+        logIn: LogIn(sessions: InMemorySessions(ana, signedIn: signedIn)),
+        onSignedIn: onSignedIn ?? (_) {},
+        roleNotAllowedMessage: 'Aplikacija je za posetioce.',
+        reason: reason,
+      ),
+    );
+
+    testWidgets('explains an expired session above the form', (tester) async {
+      await tester.pumpWidget(screen(reason: SignOutReason.expired));
+      expect(find.text(sessionExpiredMessage), findsOneWidget);
+      expect(find.text('Korisničko ime'), findsOneWidget);
+      expect(find.text('Lozinka'), findsOneWidget);
+    });
+
+    testWidgets('explains a role the app does not admit with the message of the app', (tester) async {
+      await tester.pumpWidget(screen(reason: SignOutReason.roleNotAllowed));
+      expect(find.text('Aplikacija je za posetioce.'), findsOneWidget);
+    });
+
+    testWidgets('a wrong password is explained and a right one hands over the user', (tester) async {
+      User? signedIn;
+      await tester.pumpWidget(screen(onSignedIn: (user) => signedIn = user));
+      await tester.enterText(find.widgetWithText(TextField, 'Korisničko ime'), 'ana');
+      await tester.tap(find.text('Prijavi se'));
+      await tester.pumpAndSettle();
+      expect(find.text('Pogrešno korisničko ime ili lozinka.'), findsOneWidget);
+      expect(signedIn, isNull);
+
+      await tester.enterText(find.widgetWithText(TextField, 'Lozinka'), 'tim20-demo');
+      await tester.tap(find.text('Prijavi se'));
+      await tester.pumpAndSettle();
+      expect(signedIn, ana);
     });
   });
 }
