@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ui/ui.dart';
 
+import '../shortcuts.dart';
 import '../widgets/debug_menu.dart';
 
 class EventsScreen extends StatelessWidget {
@@ -16,39 +17,50 @@ class EventsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final bloc = context.read<OrganizerEventsBloc>();
     final staff = context.read<User>();
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Ulaznice · backoffice'),
-        actions: [
-          IconButton(
-            tooltip: 'Osveži',
-            icon: const Icon(Icons.refresh),
-            onPressed: () => bloc.add(const OrganizerEventsRequested()),
-          ),
-          const DebugMenu(),
-          const SizedBox(width: 8),
-          Text(staff.name, style: Theme.of(context).textTheme.labelLarge),
-          IconButton(
-            tooltip: 'Odjavi se',
-            icon: const Icon(Icons.logout),
-            onPressed: () => context.read<SessionBloc>().add(const SessionLogOutRequested()),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: BlocBuilder<OrganizerEventsBloc, OrganizerEventsState>(
-        builder: (context, state) => switch (state) {
-          OrganizerEventsLoading() => const LoadingView(),
-          OrganizerEventsFailure(:final cause) => FailureView(
-            cause: cause,
-            onRetry: () => bloc.add(const OrganizerEventsRequested()),
-          ),
-          OrganizerEventsEmpty() => const EmptyView(
-            title: 'Nemate nijedan događaj.',
-            message: 'Događaji se u ovoj verziji unose unapred.',
-          ),
-          OrganizerEventsLoaded(:final events) => _EventList(events: events),
+    return Shortcuts(
+      shortcuts: eventShortcuts(),
+      child: Actions(
+        actions: {
+          RefreshIntent: CallbackAction<RefreshIntent>(onInvoke: (_) => bloc.add(const OrganizerEventsRequested())),
         },
+        child: FocusScope(
+          autofocus: true,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Ulaznice · backoffice'),
+              actions: [
+                IconButton(
+                  tooltip: 'Osveži (R)',
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () => bloc.add(const OrganizerEventsRequested()),
+                ),
+                const DebugMenu(),
+                const SizedBox(width: 8),
+                Text(staff.name, style: Theme.of(context).textTheme.labelLarge),
+                IconButton(
+                  tooltip: 'Odjavi se',
+                  icon: const Icon(Icons.logout),
+                  onPressed: () => context.read<SessionBloc>().add(const SessionLogOutRequested()),
+                ),
+                const SizedBox(width: 8),
+              ],
+            ),
+            body: BlocBuilder<OrganizerEventsBloc, OrganizerEventsState>(
+              builder: (context, state) => switch (state) {
+                OrganizerEventsLoading() => const LoadingView(),
+                OrganizerEventsFailure(:final cause) => FailureView(
+                  cause: cause,
+                  onRetry: () => bloc.add(const OrganizerEventsRequested()),
+                ),
+                OrganizerEventsEmpty() => const EmptyView(
+                  title: 'Nemate nijedan događaj.',
+                  message: 'Događaji se u ovoj verziji unose unapred.',
+                ),
+                OrganizerEventsLoaded(:final events) => _EventList(events: events),
+              },
+            ),
+          ),
+        ),
       ),
     );
   }

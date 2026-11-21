@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ui/ui.dart';
 
@@ -14,7 +15,7 @@ void main() {
     expect(find.text('Radionica 3D štampe'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Simuliraj grešku'));
-    await tester.tap(find.byTooltip('Osveži'));
+    await tester.tap(find.byTooltip('Osveži (R)'));
     await settle(tester);
     expect(find.text('Pokušaj ponovo'), findsOneWidget);
 
@@ -23,9 +24,23 @@ void main() {
     expect(find.text('Brucošijada'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Simuliraj prazan odgovor'));
-    await tester.tap(find.byTooltip('Osveži'));
+    await tester.tap(find.byTooltip('Osveži (R)'));
     await settle(tester);
     expect(find.byType(EmptyView), findsOneWidget);
+  });
+
+  testWidgets('R reloads the event list, also from the failure screen', (tester) async {
+    final deps = await pumpBackoffice(tester);
+    await settle(tester);
+
+    deps.fake!.failingRequests = 1;
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyR);
+    await settle(tester);
+    expect(find.text('Pokušaj ponovo'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyR);
+    await settle(tester);
+    expect(find.text('Brucošijada'), findsOneWidget);
   });
 
   testWidgets('tapping an event opens its tickets at its own address', (tester) async {
