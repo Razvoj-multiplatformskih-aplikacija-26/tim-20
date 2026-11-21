@@ -13,8 +13,8 @@ final class TicketingHandlers {
   TicketingHandlers({required this.ticketing, required this.clock, required PaymentGateway payments})
     : _reserveTickets = ReserveTickets(events: ticketing, tickets: ticketing, clock: clock),
       _payTicket = PayTicket(events: ticketing, tickets: ticketing, clock: clock, payments: payments),
-      _confirmPayment = ConfirmPayment(tickets: ticketing, clock: clock),
-      _admitTicket = AdmitTicket(tickets: ticketing, clock: clock),
+      _confirmPayment = ConfirmPayment(events: ticketing, tickets: ticketing, clock: clock),
+      _admitTicket = AdmitTicket(events: ticketing, tickets: ticketing, clock: clock),
       _cancelTicket = CancelTicket(events: ticketing, tickets: ticketing, clock: clock);
 
   final PostgresTicketing ticketing;
@@ -42,9 +42,11 @@ final class TicketingHandlers {
   }
 
   Future<Response> eventTickets(Request request) async {
-    if (!AccessPolicy.canViewEventTickets(_actor(request))) return problem(const NotAllowed());
+    final actor = _actor(request);
+    if (!AccessPolicy.canViewEventTickets(actor)) return problem(const NotAllowed());
     final id = _eventId(request);
-    if (await ticketing.findEvent(id) == null) return problem(const NotFound());
+    final event = await ticketing.findEvent(id);
+    if (event == null || !AccessPolicy.canListEvent(actor, event)) return problem(const NotFound());
     return json(200, [for (final ticket in await ticketing.ticketsFor(id)) ticket.toDto().toJson()]);
   }
 

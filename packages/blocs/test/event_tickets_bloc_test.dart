@@ -27,8 +27,8 @@ void main() {
     );
     return EventTicketsBloc(
       getEventTickets: GetEventTickets(events: store, tickets: store, clock: clock),
-      confirmPayment: ConfirmPayment(tickets: store, clock: clock),
-      admitTicket: AdmitTicket(tickets: store, clock: clock),
+      confirmPayment: ConfirmPayment(events: store, tickets: store, clock: clock),
+      admitTicket: AdmitTicket(events: store, tickets: store, clock: clock),
       voidTicket: VoidTicket(events: store, tickets: store, clock: clock),
       staff: organizer,
     );

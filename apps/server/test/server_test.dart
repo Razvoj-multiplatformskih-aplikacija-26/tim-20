@@ -363,6 +363,14 @@ void main() {
     expect((jsonDecode(answer.body) as List<Object?>).length, greaterThanOrEqualTo(10));
   });
 
+  test('an organizer cannot list another organizer\'s event tickets', () async {
+    final otherOrganizer = tokenFor('u-other', 'organizer', secret: jwtSecret);
+    final answer = await get(ApiPaths.eventTickets('e-1'), token: otherOrganizer);
+
+    expect(answer.statusCode, 404);
+    expect(codeOf(answer), ErrorCodes.notFound);
+  });
+
   test('a reservation without a token is 401 sign-in-required', () async {
     final answer = await http.post(
       base.replace(path: ApiPaths.reservations('e-1')),

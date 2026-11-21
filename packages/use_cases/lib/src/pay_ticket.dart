@@ -20,6 +20,7 @@ final class PayTicket {
     var charged = false;
     return changeTicket(
       tickets,
+      events,
       id,
       by: by,
       change: (ticket) => payTicket(ticket, by: by, now: clock.now()),

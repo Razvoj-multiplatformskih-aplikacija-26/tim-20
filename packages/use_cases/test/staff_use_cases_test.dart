@@ -8,6 +8,7 @@ void main() {
   final clock = FixedClock(now);
 
   const organizer = User(id: UserId('u-org'), name: 'Organizator', role: Role.organizer);
+  const otherOrganizer = User(id: UserId('u-other'), name: 'Drugi organizator', role: Role.organizer);
   const usher = User(id: UserId('u-usher'), name: 'Redar', role: Role.usher);
   const ana = User(id: UserId('u-ana'), name: 'Ana Anić', role: Role.visitor);
 
@@ -67,12 +68,26 @@ void main() {
       final getEventTickets = GetEventTickets(events: store, tickets: store, clock: clock);
       expect(await getEventTickets(eventId: const EventId('missing'), staff: organizer), isNull);
     });
+
+    test('returns null when an organizer requests another organizer\'s event', () async {
+      final store = InMemoryTicketing(events: [event('e-1', organizerId: otherOrganizer.id)]);
+      final getEventTickets = GetEventTickets(events: store, tickets: store, clock: clock);
+
+      expect(await getEventTickets(eventId: const EventId('e-1'), staff: organizer), isNull);
+    });
+
+    test('an usher may list another organizer\'s event', () async {
+      final store = InMemoryTicketing(events: [event('e-1', organizerId: otherOrganizer.id)]);
+      final getEventTickets = GetEventTickets(events: store, tickets: store, clock: clock);
+
+      expect(await getEventTickets(eventId: const EventId('e-1'), staff: usher), isNotNull);
+    });
   });
 
   group('ConfirmPayment', () {
     test('saves the paid ticket', () async {
       final store = InMemoryTicketing(events: [event('e-1')], tickets: [ticket('t-1')]);
-      final confirm = ConfirmPayment(tickets: store, clock: clock);
+      final confirm = ConfirmPayment(events: store, tickets: store, clock: clock);
 
       final result = await confirm(id: const TicketId('t-1'), by: organizer);
 
@@ -82,13 +97,13 @@ void main() {
 
     test('returns NotFound for an unknown id', () async {
       final store = InMemoryTicketing();
-      final confirm = ConfirmPayment(tickets: store, clock: clock);
+      final confirm = ConfirmPayment(events: store, tickets: store, clock: clock);
       expect(await confirm(id: const TicketId('missing'), by: organizer), const Failure<Ticket>(NotFound()));
     });
 
     test('a visitor may see their own ticket but not confirm its payment', () async {
       final store = InMemoryTicketing(events: [event('e-1')], tickets: [ticket('t-1')]);
-      final confirm = ConfirmPayment(tickets: store, clock: clock);
+      final confirm = ConfirmPayment(events: store, tickets: store, clock: clock);
       expect(await confirm(id: const TicketId('t-1'), by: ana), const Failure<Ticket>(NotAllowed()));
     });
   });
@@ -98,7 +113,7 @@ void main() {
       events: [event('e-1')],
       tickets: [ticket('t-1', status: Paid(paidAt: now))],
     );
-    final admit = AdmitTicket(tickets: store, clock: clock);
+    final admit = AdmitTicket(events: store, tickets: store, clock: clock);
 
     final first = await admit(id: const TicketId('t-1'), by: organizer);
     final second = await admit(id: const TicketId('t-1'), by: organizer);
@@ -107,18 +122,33 @@ void main() {
     expect(second, const Failure<Ticket>(TicketAlreadyUsed()));
   });
 
+  test('an organizer cannot admit a ticket for another event, but an usher can', () async {
+    final store = InMemoryTicketing(
+      events: [event('e-1', organizerId: otherOrganizer.id)],
+      tickets: [ticket('t-1', status: Paid(paidAt: now))],
+    );
+    final admit = AdmitTicket(events: store, tickets: store, clock: clock);
+
+    expect(await admit(id: const TicketId('t-1'), by: organizer), const Failure<Ticket>(NotFound()));
+    expect(await admit(id: const TicketId('t-1'), by: usher), isA<Success<Ticket>>());
+  });
+
   test('AdmitTicket that loses the race to another admission reads again and reports TicketAlreadyUsed', () async {
+    final events = InMemoryTicketing(
+      events: [event('e-1')],
+      tickets: [ticket('t-1', status: Paid(paidAt: now))],
+    );
     final store = RacingTicketing(
-      InMemoryTicketing(
-        events: [event('e-1')],
-        tickets: [ticket('t-1', status: Paid(paidAt: now))],
-      ),
+      events,
       meanwhile: (ticket) => ticket.copyWith(
         status: Used(scannedAt: now, scannedBy: usher.id),
       ),
     );
 
-    final result = await AdmitTicket(tickets: store, clock: clock)(id: const TicketId('t-1'), by: organizer);
+    final result = await AdmitTicket(events: events, tickets: store, clock: clock)(
+      id: const TicketId('t-1'),
+      by: organizer,
+    );
 
     expect(result, const Failure<Ticket>(TicketAlreadyUsed()));
     expect((await store.findTicket(const TicketId('t-1')))?.status, Used(scannedAt: now, scannedBy: usher.id));

@@ -1,5 +1,6 @@
 import 'package:domain/domain.dart';
 
+import 'ports/event_repository.dart';
 import 'ports/ticket_repository.dart';
 
 const _attempts = 3;
@@ -11,6 +12,7 @@ const _attempts = 3;
 /// Someone else's ticket is NotFound, so the answer does not reveal that it exists.
 Future<Result<Ticket>> changeTicket(
   TicketRepository tickets,
+  EventRepository events,
   TicketId id, {
   required User by,
   required Result<Ticket> Function(Ticket current) change,
@@ -20,6 +22,10 @@ Future<Result<Ticket>> changeTicket(
   for (var attempt = 0; attempt < _attempts; attempt++) {
     final ticket = await tickets.findTicket(id);
     if (ticket == null || !AccessPolicy.canView(by, ticket)) return const Failure(NotFound());
+    if (by.role.isStaff) {
+      final event = await events.findEvent(ticket.eventId);
+      if (event == null || !AccessPolicy.canListEvent(by, event)) return const Failure(NotFound());
+    }
     switch (change(ticket)) {
       case Failure(:final error):
         return Failure(error);

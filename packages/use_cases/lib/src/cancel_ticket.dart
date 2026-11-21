@@ -17,6 +17,7 @@ final class CancelTicket {
     if (event == null) return const Failure(NotFound());
     return changeTicket(
       tickets,
+      events,
       id,
       by: by,
       change: (ticket) => cancelTicket(ticket, event, by: by, now: clock.now(), reason: reason),
