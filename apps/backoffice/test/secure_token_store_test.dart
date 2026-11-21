@@ -27,4 +27,28 @@ void main() {
     await expectLater(const SecureTokenStore().write('token'), failsAsRepository);
     await expectLater(const SecureTokenStore().clear(), failsAsRepository);
   });
+
+  test('a failed delete stores an empty tombstone that reads as no session', () async {
+    var stored = 'expired-token';
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+      final arguments = call.arguments as Map<Object?, Object?>;
+      switch (call.method) {
+        case 'delete':
+          throw PlatformException(code: 'denied');
+        case 'write':
+          stored = arguments['value']! as String;
+          return null;
+        case 'read':
+          return stored;
+        default:
+          return null;
+      }
+    });
+
+    const store = SecureTokenStore();
+    await store.clear();
+
+    expect(stored, '');
+    expect(await store.read(), isNull);
+  });
 }

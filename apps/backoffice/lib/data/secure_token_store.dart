@@ -10,18 +10,19 @@ import 'package:use_cases/use_cases.dart';
 /// so the app never waits forever on an error it does not know.
 final class SecureTokenStore implements TokenStore {
   const SecureTokenStore([
-    /// The data protection keychain needs a provisioning profile; the login keychain also works in unsigned builds.
     this._storage = const FlutterSecureStorage(mOptions: MacOsOptions(usesDataProtectionKeychain: false)),
   ]);
 
   static const _key = 'tim20_session';
 
+  /// The data protection keychain needs a provisioning profile; the login keychain also works in unsigned builds.
   final FlutterSecureStorage _storage;
 
   @override
   Future<String?> read() async {
     try {
-      return await _storage.read(key: _key);
+      final token = await _storage.read(key: _key);
+      return token == null || token.isEmpty ? null : token;
     } on PlatformException {
       return null;
     }
@@ -31,7 +32,13 @@ final class SecureTokenStore implements TokenStore {
   Future<void> write(String token) => _guard(() => _storage.write(key: _key, value: token));
 
   @override
-  Future<void> clear() => _guard(() => _storage.delete(key: _key));
+  Future<void> clear() async {
+    try {
+      await _storage.delete(key: _key);
+    } on PlatformException {
+      await _guard(() => _storage.write(key: _key, value: ''));
+    }
+  }
 
   Future<void> _guard(Future<void> Function() call) async {
     try {
