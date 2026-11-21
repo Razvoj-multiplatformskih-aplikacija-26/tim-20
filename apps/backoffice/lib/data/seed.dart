@@ -1,7 +1,7 @@
 import 'package:domain/domain.dart';
 
 const organizer = User(id: UserId('u-org'), name: 'Organizator', role: Role.organizer);
-const _usher = UserId('u-usher');
+const usher = User(id: UserId('u-usher'), name: 'Redar', role: Role.usher);
 
 const _visitors = [
   ('u-ana', 'Ana Anić'),
@@ -84,7 +84,7 @@ List<Ticket> seedTickets(DateTime now) {
         brucosijada,
         Used(
           scannedAt: now.subtract(Duration(minutes: 30 - i)),
-          scannedBy: _usher,
+          scannedBy: usher.id,
         ),
       ),
     for (var i = 0; i < 3; i++)

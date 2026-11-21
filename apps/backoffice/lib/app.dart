@@ -1,11 +1,15 @@
 import 'package:blocs/blocs.dart';
+import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ui/ui.dart';
+import 'package:use_cases/use_cases.dart';
 
 import 'dependencies.dart';
 import 'router.dart';
+
+const _title = 'Ulaznice · backoffice';
 
 class BackofficeApp extends StatefulWidget {
   const BackofficeApp({super.key, required this.dependencies});
@@ -17,7 +21,90 @@ class BackofficeApp extends StatefulWidget {
 }
 
 class _BackofficeAppState extends State<BackofficeApp> {
-  late final GoRouter _router = createRouter();
+  late final SessionBloc _session = SessionBloc(
+    restoreSession: widget.dependencies.restoreSession,
+    logOut: widget.dependencies.logOut,
+    admits: AccessPolicy.canUseBackoffice,
+    expirations: widget.dependencies.sessionExpirations,
+  )..add(const SessionRestoreRequested());
+
+  /// The address the app was opened at, read before the first screen: the browser resets it to '/' as soon as a
+  /// navigator starts, so a refresh while signed in would otherwise lose the event and the selected ticket.
+  late String _startLocation;
+
+  @override
+  void initState() {
+    super.initState();
+    _startLocation = WidgetsBinding.instance.platformDispatcher.defaultRouteName;
+  }
+
+  @override
+  void dispose() {
+    _session.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dependencies = widget.dependencies;
+    return RepositoryProvider.value(
+      value: dependencies,
+      child: BlocProvider.value(
+        value: _session,
+        child: BlocConsumer<SessionBloc, SessionState>(
+          listenWhen: (previous, current) => previous is SignedIn && current is! SignedIn,
+          listener: (context, session) => _startLocation = '/',
+          builder: (context, session) => switch (session) {
+            SessionUnknown() => _material(
+              key: const ValueKey('session-unknown'),
+              home: const Scaffold(body: LoadingView()),
+            ),
+            SignedOut(reason: SignOutReason.unreachable) => _material(
+              key: const ValueKey('signed-out unreachable'),
+              home: Scaffold(
+                body: FailureView(
+                  cause: const RepositoryException('Server unreachable', failure: RepositoryFailure.unreachable),
+                  onRetry: () => _session.add(const SessionRestoreRequested()),
+                ),
+              ),
+            ),
+            SignedOut(:final reason) => _material(
+              key: ValueKey('signed-out ${reason?.name}'),
+              home: LoginScreen(
+                title: _title,
+                logIn: dependencies.logIn,
+                reason: reason,
+                roleNotAllowedMessage: 'Backoffice je za organizatore i redare.',
+                onSignedIn: (user) => _session.add(SessionStarted(user)),
+              ),
+            ),
+            SignedIn(:final user) => _SignedInApp(
+              key: ValueKey(user.id),
+              staff: user,
+              dependencies: dependencies,
+              initialLocation: _startLocation,
+            ),
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// A new router and a new list of events for every signed-in user, so nothing of the previous one stays on screen.
+class _SignedInApp extends StatefulWidget {
+  const _SignedInApp({super.key, required this.staff, required this.dependencies, required this.initialLocation});
+
+  final User staff;
+  final BackofficeDependencies dependencies;
+  final String initialLocation;
+
+  @override
+  State<_SignedInApp> createState() => _SignedInAppState();
+}
+
+class _SignedInAppState extends State<_SignedInApp> {
+  late final GoRouter _router = createRouter(initialLocation: widget.initialLocation);
 
   @override
   void dispose() {
@@ -27,22 +114,39 @@ class _BackofficeAppState extends State<BackofficeApp> {
 
   @override
   Widget build(BuildContext context) {
-    final dependencies = widget.dependencies;
     return RepositoryProvider.value(
-      value: dependencies,
+      value: widget.staff,
       child: BlocProvider(
         create: (_) =>
-            OrganizerEventsBloc(dependencies.getOrganizerEvents, organizer: dependencies.staff)
+            OrganizerEventsBloc(widget.dependencies.getOrganizerEvents, organizer: widget.staff)
               ..add(const OrganizerEventsRequested()),
-        child: MaterialApp.router(
-          title: 'Ulaznice · organizator',
-          debugShowCheckedModeBanner: false,
-          theme: TicketsTheme.light(),
-          darkTheme: TicketsTheme.dark(),
-          themeMode: ThemeMode.system,
-          routerConfig: _router,
-        ),
+        child: _material(router: _router),
       ),
     );
   }
+}
+
+/// Before sign-in the app does not try to open the address of the page as a route; the router opens it later.
+Widget _material({Key? key, Widget? home, GoRouter? router}) {
+  if (router != null) {
+    return MaterialApp.router(
+      key: key,
+      title: _title,
+      debugShowCheckedModeBanner: false,
+      theme: TicketsTheme.light(),
+      darkTheme: TicketsTheme.dark(),
+      themeMode: ThemeMode.system,
+      routerConfig: router,
+    );
+  }
+  return MaterialApp(
+    key: key,
+    title: _title,
+    debugShowCheckedModeBanner: false,
+    theme: TicketsTheme.light(),
+    darkTheme: TicketsTheme.dark(),
+    themeMode: ThemeMode.system,
+    onGenerateInitialRoutes: (_) => [MaterialPageRoute<void>(builder: (_) => home!)],
+    onGenerateRoute: (_) => MaterialPageRoute<void>(builder: (_) => home!),
+  );
 }

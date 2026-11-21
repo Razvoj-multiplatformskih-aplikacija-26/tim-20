@@ -35,7 +35,7 @@ class EventTicketsScreen extends StatelessWidget {
         confirmPayment: dependencies.confirmPayment,
         admitTicket: dependencies.admitTicket,
         voidTicket: dependencies.voidTicket,
-        staff: dependencies.staff,
+        staff: context.read<User>(),
       )..add(EventTicketsRequested(eventId, selectedId: selectedId)),
       child: _EventTicketsView(eventId: eventId, selectedId: selectedId),
     );
@@ -121,7 +121,7 @@ class _EventTicketsViewState extends State<_EventTicketsView> {
         StaffAction.voidTicket => 'Karta je poništena.',
       },
       StaffActionRejected(:final error) => error.message,
-      StaffActionFailed() => 'Izmena nije sačuvana.',
+      StaffActionFailed(:final cause) => failureMessage(cause),
     };
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     _bloc.add(const EventTicketsNoticeAcknowledged());
@@ -205,7 +205,8 @@ class _EventTicketsViewState extends State<_EventTicketsView> {
                 listener: (context, state) => _showNotice(context, (state as EventTicketsLoaded).notice!),
                 builder: (context, state) => switch (state) {
                   EventTicketsLoading() => const LoadingView(),
-                  EventTicketsFailure() => FailureView(
+                  EventTicketsFailure(:final cause) => FailureView(
+                    cause: cause,
                     onRetry: () => bloc.add(EventTicketsRequested(widget.eventId, selectedId: widget.selectedId)),
                   ),
                   EventTicketsNotFound() => const EmptyView(title: 'Događaj nije pronađen.'),

@@ -48,6 +48,10 @@ Map<ShortcutActivator, Intent> ticketShortcuts() => {
   const CharacterActivator('?'): const ShowShortcutsIntent(),
 };
 
+Map<ShortcutActivator, Intent> eventShortcuts() => {
+  const SingleActivator(LogicalKeyboardKey.keyR): const RefreshIntent(),
+};
+
 final class ShortcutDescription {
   const ShortcutDescription(this.keys, this.description);
 
