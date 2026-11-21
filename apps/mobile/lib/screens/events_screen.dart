@@ -26,9 +26,9 @@ class EventsScreen extends StatelessWidget {
           onRefresh: () => _refresh(bloc),
           child: switch (state) {
             EventsLoading() => const LoadingView(),
-            EventsFailure() => ListView(
+            EventsFailure(:final cause) => ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              children: [FailureView(onRetry: () => bloc.add(const EventsRequested()))],
+              children: [FailureView(cause: cause, onRetry: () => bloc.add(const EventsRequested()))],
             ),
             EventsEmpty() => ListView(
               physics: const AlwaysScrollableScrollPhysics(),

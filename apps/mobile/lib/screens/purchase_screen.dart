@@ -64,7 +64,10 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
           appBar: AppBar(title: const Text('Kupovina')),
           body: switch (state) {
             PurchaseLoading() || PurchaseCompleted() => const LoadingView(),
-            PurchaseFailure() => FailureView(onRetry: () => bloc.add(PurchaseStarted(widget.id))),
+            PurchaseFailure(:final cause) => FailureView(
+              cause: cause,
+              onRetry: () => bloc.add(PurchaseStarted(widget.id)),
+            ),
             PurchaseNotFound() => const EmptyView(title: 'Događaj nije pronađen.'),
             PurchaseReady() => Form(
               key: _formKey,

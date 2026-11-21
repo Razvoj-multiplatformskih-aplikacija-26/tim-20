@@ -18,7 +18,6 @@ class EventCard extends StatelessWidget {
     final soldOut = listing.remaining == 0;
     final muted = theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
     return Card(
-      // The whole card is one tappable item for a screen reader: name, time, place, price and seats.
       child: MergeSemantics(
         child: InkWell(
           onTap: onOpen,

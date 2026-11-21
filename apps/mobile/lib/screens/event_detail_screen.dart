@@ -7,11 +7,16 @@ import 'package:ui/ui.dart';
 import 'package:use_cases/use_cases.dart';
 
 import '../text.dart';
+import 'sign_in_screen.dart';
 
 class EventDetailScreen extends StatelessWidget {
   const EventDetailScreen({super.key, required this.id});
 
   final EventId id;
+
+  Future<void> _buy(BuildContext context) async {
+    if (await ensureSignedIn(context) && context.mounted) await context.push('/dogadjaj/${id.value}/kupovina');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +30,10 @@ class EventDetailScreen extends StatelessWidget {
           appBar: AppBar(title: const Text('Događaj')),
           body: switch (state) {
             EventsLoading() => const LoadingView(),
-            EventsFailure() => FailureView(onRetry: () => context.read<EventsBloc>().add(const EventsRequested())),
+            EventsFailure(:final cause) => FailureView(
+              cause: cause,
+              onRetry: () => context.read<EventsBloc>().add(const EventsRequested()),
+            ),
             EventsEmpty() || EventsLoaded() =>
               listing == null ? const EmptyView(title: 'Događaj nije pronađen.') : _Details(listing: listing),
           },
@@ -34,7 +42,7 @@ class EventDetailScreen extends StatelessWidget {
               : SafeArea(
                   minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: FilledButton(
-                    onPressed: listing.remaining == 0 ? null : () => context.push('/dogadjaj/${id.value}/kupovina'),
+                    onPressed: listing.remaining == 0 ? null : () => _buy(context),
                     child: Text(listing.remaining == 0 ? 'Rasprodato' : 'Kupi karte'),
                   ),
                 ),

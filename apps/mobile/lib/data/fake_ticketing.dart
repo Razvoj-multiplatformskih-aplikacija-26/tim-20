@@ -15,12 +15,15 @@ final class FakeTicketing implements EventRepository, TicketRepository {
   int failingRequests = 0;
   int emptyResponses = 0;
 
+  /// How the next failing request fails, so every message for a server failure is tested without a server.
+  RepositoryFailure failingWith = RepositoryFailure.unreachable;
+
   /// Lists and writes pay the latency; lookups by id are answered from the same round trip.
   Future<void> _roundTrip({bool slow = true}) async {
     if (slow) await Future<void>.delayed(latency);
     if (failingRequests > 0) {
       failingRequests--;
-      throw const RepositoryException('Simulated outage', failure: RepositoryFailure.unreachable);
+      throw RepositoryException('Simulated outage', failure: failingWith);
     }
   }
 
