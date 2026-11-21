@@ -43,13 +43,13 @@ Map<ShortcutActivator, Intent> ticketShortcuts() => {
   const SingleActivator(LogicalKeyboardKey.keyC): const ConfirmPaymentIntent(),
   const SingleActivator(LogicalKeyboardKey.keyU): const AdmitTicketIntent(),
   const SingleActivator(LogicalKeyboardKey.keyX): const VoidTicketIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyR): const RefreshIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyR, includeRepeats: false): const RefreshIntent(),
   const SingleActivator(LogicalKeyboardKey.escape): const ClearSelectionIntent(),
   const CharacterActivator('?'): const ShowShortcutsIntent(),
 };
 
 Map<ShortcutActivator, Intent> eventShortcuts() => {
-  const SingleActivator(LogicalKeyboardKey.keyR): const RefreshIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyR, includeRepeats: false): const RefreshIntent(),
 };
 
 final class ShortcutDescription {
