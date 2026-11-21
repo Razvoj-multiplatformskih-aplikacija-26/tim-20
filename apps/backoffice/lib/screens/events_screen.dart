@@ -15,9 +15,10 @@ class EventsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bloc = context.read<OrganizerEventsBloc>();
+    final staff = context.read<User>();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ulaznice · organizator'),
+        title: const Text('Ulaznice · backoffice'),
         actions: [
           IconButton(
             tooltip: 'Osveži',
@@ -25,6 +26,13 @@ class EventsScreen extends StatelessWidget {
             onPressed: () => bloc.add(const OrganizerEventsRequested()),
           ),
           const DebugMenu(),
+          const SizedBox(width: 8),
+          Text(staff.name, style: Theme.of(context).textTheme.labelLarge),
+          IconButton(
+            tooltip: 'Odjavi se',
+            icon: const Icon(Icons.logout),
+            onPressed: () => context.read<SessionBloc>().add(const SessionLogOutRequested()),
+          ),
           const SizedBox(width: 8),
         ],
       ),

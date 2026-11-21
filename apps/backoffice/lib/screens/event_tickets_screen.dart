@@ -35,7 +35,7 @@ class EventTicketsScreen extends StatelessWidget {
         confirmPayment: dependencies.confirmPayment,
         admitTicket: dependencies.admitTicket,
         voidTicket: dependencies.voidTicket,
-        staff: dependencies.staff,
+        staff: context.read<User>(),
       )..add(EventTicketsRequested(eventId, selectedId: selectedId)),
       child: _EventTicketsView(eventId: eventId, selectedId: selectedId),
     );

@@ -1,5 +1,7 @@
 import 'package:backoffice/app.dart';
+import 'package:backoffice/data/seed.dart';
 import 'package:backoffice/dependencies.dart';
+import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -7,8 +9,11 @@ import 'package:use_cases/use_cases.dart';
 
 final sundayEvening = DateTime.utc(2026, 11, 1, 18);
 
-BackofficeDependencies fakeDependencies({Duration latency = Duration.zero}) =>
-    BackofficeDependencies.fake(clock: FixedClock(sundayEvening), latency: latency);
+BackofficeDependencies fakeDependencies({
+  Duration latency = Duration.zero,
+  bool signedIn = true,
+  User staff = organizer,
+}) => BackofficeDependencies.fake(clock: FixedClock(sundayEvening), latency: latency, signedIn: signedIn, staff: staff);
 
 void useWindow(WidgetTester tester, {required double width, required double height}) {
   tester.view.physicalSize = Size(width * 2, height * 2);

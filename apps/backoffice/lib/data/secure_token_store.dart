@@ -1,0 +1,23 @@
+import 'package:api_client/api_client.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+/// The session token in the macOS keychain; the password is never stored.
+final class SecureTokenStore implements TokenStore {
+  const SecureTokenStore([
+    /// The data protection keychain needs a provisioning profile; the login keychain also works in unsigned builds.
+    this._storage = const FlutterSecureStorage(mOptions: MacOsOptions(usesDataProtectionKeychain: false)),
+  ]);
+
+  static const _key = 'tim20_session';
+
+  final FlutterSecureStorage _storage;
+
+  @override
+  Future<String?> read() => _storage.read(key: _key);
+
+  @override
+  Future<void> write(String token) => _storage.write(key: _key, value: token);
+
+  @override
+  Future<void> clear() => _storage.delete(key: _key);
+}
