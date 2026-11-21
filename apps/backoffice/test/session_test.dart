@@ -17,10 +17,11 @@ import 'support.dart';
 const ana = User(id: UserId('u-ana'), name: 'Ana Anić', role: Role.visitor);
 
 final class _ExpiringSessions implements SessionRepository {
-  _ExpiringSessions({this.restoreFails = false, this.unreachableRestores = 0});
+  _ExpiringSessions({this.restoreFails = false, this.unreachableRestores = 0, this.restoreFailure});
 
   final bool restoreFails;
   int unreachableRestores;
+  final RepositoryFailure? restoreFailure;
   final _expirations = StreamController<void>.broadcast();
 
   void expire() => _expirations.add(null);
@@ -32,6 +33,9 @@ final class _ExpiringSessions implements SessionRepository {
   Future<User?> current() async {
     if (restoreFails) {
       throw const RepositoryException('Session expired', failure: RepositoryFailure.sessionExpired);
+    }
+    if (restoreFailure case final failure?) {
+      throw RepositoryException('Session restore failed', failure: failure);
     }
     if (unreachableRestores > 0) {
       unreachableRestores--;
@@ -190,6 +194,19 @@ void main() {
     expect(find.text('Brucošijada'), findsOneWidget);
   });
 
+  testWidgets('a server error while restoring offers a way to sign in', (tester) async {
+    await pumpBackoffice(
+      tester,
+      dependencies: dependenciesWith(sessions: _ExpiringSessions(restoreFailure: RepositoryFailure.serverError)),
+    );
+    await settle(tester);
+
+    expect(find.text('Greška na serveru.'), findsOneWidget);
+    await tester.tap(find.text('Prijavi se'));
+    await settle(tester);
+    expect(find.byType(LoginScreen), findsOneWidget);
+  });
+
   testWidgets('a refresh in the browser keeps the address after the session is restored', (tester) async {
     useWindow(tester, width: 1200, height: 800);
     await pumpBackoffice(tester, location: '/dogadjaji/e-a?selected=t-01');
@@ -212,6 +229,25 @@ void main() {
     await signIn(tester, 'organizator');
 
     expect(currentLocation(tester), '/');
+  });
+
+  testWidgets('the same user returns to the open event after signing in again', (tester) async {
+    final sessions = _ExpiringSessions();
+    useWindow(tester, width: 1200, height: 800);
+    await pumpBackoffice(
+      tester,
+      dependencies: dependenciesWith(sessions: sessions),
+      location: '/dogadjaji/e-a?selected=t-01',
+    );
+    await settle(tester);
+    expect(find.byType(TicketTable), findsOneWidget);
+
+    sessions.expire();
+    await settle(tester);
+    await signIn(tester, 'organizator');
+
+    expect(currentLocation(tester), '/dogadjaji/e-a?selected=t-01');
+    expect(find.descendant(of: find.byType(TicketDetailPanel), matching: find.text('T20-t-01')), findsOneWidget);
   });
 
   testWidgets("the server down shows 'Nema veze sa serverom.' and 'Pokušaj ponovo'", (tester) async {

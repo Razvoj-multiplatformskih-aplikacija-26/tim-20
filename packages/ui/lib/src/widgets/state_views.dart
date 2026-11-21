@@ -14,12 +14,13 @@ class LoadingView extends StatelessWidget {
 }
 
 class FailureView extends StatelessWidget {
-  const FailureView({super.key, required this.onRetry, this.cause});
+  const FailureView({super.key, required this.onRetry, this.cause, this.secondaryAction});
 
   final VoidCallback onRetry;
 
   /// What stopped the data, so the screen can say that the server is down instead of a generic text.
   final Object? cause;
+  final Widget? secondaryAction;
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +44,7 @@ class FailureView extends StatelessWidget {
               icon: const Icon(Icons.refresh),
               label: const Text('Pokušaj ponovo'),
             ),
+            if (secondaryAction case final action?) ...[const SizedBox(height: 8), action],
           ],
         ),
       ),

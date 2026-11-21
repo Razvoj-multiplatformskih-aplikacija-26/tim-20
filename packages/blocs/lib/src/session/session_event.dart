@@ -8,6 +8,10 @@ final class SessionRestoreRequested extends SessionEvent {
   const SessionRestoreRequested();
 }
 
+final class SessionRestoreSkipped extends SessionEvent {
+  const SessionRestoreSkipped();
+}
+
 final class SessionStarted extends SessionEvent {
   const SessionStarted(this.user);
 

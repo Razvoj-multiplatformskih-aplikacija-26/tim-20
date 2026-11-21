@@ -59,6 +59,17 @@ Future<TokenStore> tokenOfAna() async {
   return tokens;
 }
 
+final class _CannotClearTokenStore implements TokenStore {
+  @override
+  Future<String?> read() async => 'expired-token';
+
+  @override
+  Future<void> write(String token) async {}
+
+  @override
+  Future<void> clear() async => throw const RepositoryException('Cannot clear token');
+}
+
 void main() {
   group('tickets', () {
     test('the server taking the last seat first reaches the client as NotEnoughSeats', () async {
@@ -275,6 +286,20 @@ void main() {
         throwsA(isA<RepositoryException>().having((e) => e.failure, 'failure', RepositoryFailure.sessionExpired)),
       );
       expect(await tokens.read(), isNull);
+    });
+
+    test('a failed token clear does not hide an expired session', () async {
+      final server = MockClient(
+        (request) async =>
+            problem(const ProblemDto(status: 401, code: ErrorCodes.sessionExpired, title: 'Session expired')),
+      );
+
+      await expectLater(
+        HttpSessionRepository(apiOver(server, tokens: _CannotClearTokenStore())).current(),
+        throwsA(
+          isA<RepositoryException>().having((error) => error.failure, 'failure', RepositoryFailure.sessionExpired),
+        ),
+      );
     });
 
     test('restoring without a stored token asks nothing and is null', () async {

@@ -1,6 +1,6 @@
 part of 'session_bloc.dart';
 
-enum SignOutReason { loggedOut, expired, unreachable, roleNotAllowed }
+enum SignOutReason { loggedOut, expired, unreachable, restoreFailed, roleNotAllowed }
 
 sealed class SessionState extends Equatable {
   const SessionState();
@@ -17,12 +17,13 @@ final class SessionUnknown extends SessionState {
 }
 
 final class SignedOut extends SessionState {
-  const SignedOut({this.reason});
+  const SignedOut({this.reason, this.cause});
 
   final SignOutReason? reason;
+  final Object? cause;
 
   @override
-  List<Object?> get props => [reason];
+  List<Object?> get props => [reason, cause];
 
   @override
   String toString() => 'SignedOut(${reason?.name})';

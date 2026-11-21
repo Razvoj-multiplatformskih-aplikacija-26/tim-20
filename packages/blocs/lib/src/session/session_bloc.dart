@@ -17,6 +17,7 @@ final class SessionBloc extends Bloc<SessionEvent, SessionState> {
     required Stream<void> expirations,
   }) : super(const SessionUnknown()) {
     on<SessionRestoreRequested>(_onRestoreRequested);
+    on<SessionRestoreSkipped>((event, emit) => emit(const SignedOut()));
     on<SessionStarted>(_onStarted);
     on<SessionLogOutRequested>(_onLogOutRequested);
     on<SessionExpired>((event, emit) {
@@ -29,18 +30,27 @@ final class SessionBloc extends Bloc<SessionEvent, SessionState> {
   final LogOut logOut;
   final bool Function(User user) admits;
   late final StreamSubscription<void> _expirations;
+  bool _restoring = false;
 
   Future<void> _onRestoreRequested(SessionRestoreRequested event, Emitter<SessionState> emit) async {
+    if (_restoring) return;
+    _restoring = true;
+    if (state is! SessionUnknown) emit(const SessionUnknown());
     try {
       final user = await restoreSession();
       if (user == null) return emit(const SignedOut());
       add(SessionStarted(user));
     } on RepositoryException catch (cause) {
-      emit(
-        SignedOut(
-          reason: cause.failure == RepositoryFailure.sessionExpired ? SignOutReason.expired : SignOutReason.unreachable,
-        ),
-      );
+      final reason = switch (cause.failure) {
+        RepositoryFailure.unreachable => SignOutReason.unreachable,
+        RepositoryFailure.sessionExpired => SignOutReason.expired,
+        _ => SignOutReason.restoreFailed,
+      };
+      emit(SignedOut(reason: reason, cause: cause));
+    } on Object catch (cause) {
+      emit(SignedOut(reason: SignOutReason.restoreFailed, cause: cause));
+    } finally {
+      _restoring = false;
     }
   }
 

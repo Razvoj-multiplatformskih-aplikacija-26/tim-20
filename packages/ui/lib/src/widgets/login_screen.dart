@@ -79,6 +79,7 @@ class _LoginFormState extends State<_LoginForm> {
         SignOutReason.roleNotAllowed => widget.roleNotAllowedMessage,
         SignOutReason.expired => sessionExpiredMessage,
         SignOutReason.unreachable => serverUnreachableMessage,
+        SignOutReason.restoreFailed => 'Sesija nije mogla da se obnovi. Prijavite se ponovo.',
         SignOutReason.loggedOut || null => null,
       },
     };
