@@ -29,7 +29,6 @@ class TicketTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // The header opens the detail and reads as one item; the buttons below stay separate.
           MergeSemantics(
             child: InkWell(
               onTap: onOpen,
