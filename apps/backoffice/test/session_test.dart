@@ -17,9 +17,10 @@ import 'support.dart';
 const ana = User(id: UserId('u-ana'), name: 'Ana Anić', role: Role.visitor);
 
 final class _ExpiringSessions implements SessionRepository {
-  _ExpiringSessions({this.restoreFails = false});
+  _ExpiringSessions({this.restoreFails = false, this.unreachableRestores = 0});
 
   final bool restoreFails;
+  int unreachableRestores;
   final _expirations = StreamController<void>.broadcast();
 
   void expire() => _expirations.add(null);
@@ -31,6 +32,10 @@ final class _ExpiringSessions implements SessionRepository {
   Future<User?> current() async {
     if (restoreFails) {
       throw const RepositoryException('Session expired', failure: RepositoryFailure.sessionExpired);
+    }
+    if (unreachableRestores > 0) {
+      unreachableRestores--;
+      throw const RepositoryException('Server down', failure: RepositoryFailure.unreachable);
     }
     return organizer;
   }
@@ -171,6 +176,18 @@ void main() {
 
     expect(find.byType(LoginScreen), findsOneWidget);
     expect(find.text('Prijava je istekla. Prijavite se ponovo.'), findsOneWidget);
+  });
+
+  testWidgets('the server down at start offers a retry that restores the saved session', (tester) async {
+    await pumpBackoffice(tester, dependencies: dependenciesWith(sessions: _ExpiringSessions(unreachableRestores: 1)));
+    await settle(tester);
+
+    expect(find.byType(LoginScreen), findsNothing);
+    expect(find.text('Nema veze sa serverom.'), findsOneWidget);
+
+    await tester.tap(find.text('Pokušaj ponovo'));
+    await settle(tester);
+    expect(find.text('Brucošijada'), findsOneWidget);
   });
 
   testWidgets('a refresh in the browser keeps the address after the session is restored', (tester) async {

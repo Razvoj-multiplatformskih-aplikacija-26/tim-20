@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ui/ui.dart';
+import 'package:use_cases/use_cases.dart';
 
 import 'dependencies.dart';
 import 'router.dart';
@@ -57,6 +58,15 @@ class _BackofficeAppState extends State<BackofficeApp> {
             SessionUnknown() => _material(
               key: const ValueKey('session-unknown'),
               home: const Scaffold(body: LoadingView()),
+            ),
+            SignedOut(reason: SignOutReason.unreachable) => _material(
+              key: const ValueKey('signed-out unreachable'),
+              home: Scaffold(
+                body: FailureView(
+                  cause: const RepositoryException('Server unreachable', failure: RepositoryFailure.unreachable),
+                  onRetry: () => _session.add(const SessionRestoreRequested()),
+                ),
+              ),
             ),
             SignedOut(:final reason) => _material(
               key: ValueKey('signed-out ${reason?.name}'),
