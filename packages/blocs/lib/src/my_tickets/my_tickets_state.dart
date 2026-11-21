@@ -10,6 +10,11 @@ sealed class MyTicketsState extends Equatable {
   String toString() => '$runtimeType';
 }
 
+/// Nobody is signed in, so there are no tickets to show.
+final class MyTicketsSignedOut extends MyTicketsState {
+  const MyTicketsSignedOut();
+}
+
 final class MyTicketsLoading extends MyTicketsState {
   const MyTicketsLoading();
 }

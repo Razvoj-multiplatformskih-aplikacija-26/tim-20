@@ -6,7 +6,6 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:ui/ui.dart';
 import 'package:use_cases/use_cases.dart';
 
-import '../dependencies.dart';
 import '../text.dart';
 import '../widgets/ticket_tile.dart';
 import 'my_tickets_screen.dart';
@@ -22,15 +21,18 @@ class TicketDetailScreen extends StatelessWidget {
     return BlocBuilder<MyTicketsBloc, MyTicketsState>(
       builder: (context, state) {
         final owned = switch (state) {
-          MyTicketsLoading() || MyTicketsFailure() || MyTicketsEmpty() => null,
+          MyTicketsSignedOut() || MyTicketsLoading() || MyTicketsFailure() || MyTicketsEmpty() => null,
           MyTicketsLoaded() => state.byId(id),
         };
         return Scaffold(
           appBar: AppBar(title: const Text('Karta')),
           body: switch (state) {
             MyTicketsLoading() => const LoadingView(),
-            MyTicketsFailure() => FailureView(onRetry: () => bloc.add(const MyTicketsRequested())),
-            MyTicketsEmpty() => const EmptyView(title: 'Karta nije pronađena.'),
+            MyTicketsFailure(:final cause) => FailureView(
+              cause: cause,
+              onRetry: () => bloc.add(const MyTicketsRequested()),
+            ),
+            MyTicketsSignedOut() || MyTicketsEmpty() => const EmptyView(title: 'Karta nije pronađena.'),
             MyTicketsLoaded(:final loadedAt) =>
               owned == null ? const EmptyView(title: 'Karta nije pronađena.') : _Details(owned: owned, now: loadedAt),
           },
@@ -63,9 +65,12 @@ class _Details extends StatelessWidget {
   /// Why an active ticket cannot be cancelled: the same rule the bloc would run, asked only for its error.
   String? _cancellationNote(BuildContext context) {
     if (owned.actions.contains(VisitorAction.cancel) || !owned.ticket.status.isActive) return null;
-    final visitor = context.read<AppDependencies>().visitor;
-    final result = cancelTicket(owned.ticket, owned.event, by: visitor, now: now);
-    return switch (result) {
+    final visitor = switch (context.read<SessionBloc>().state) {
+      SignedIn(:final user) => user,
+      SessionUnknown() || SignedOut() => null,
+    };
+    if (visitor == null) return null;
+    return switch (cancelTicket(owned.ticket, owned.event, by: visitor, now: now)) {
       Success() => null,
       Failure(:final error) => error.message,
     };

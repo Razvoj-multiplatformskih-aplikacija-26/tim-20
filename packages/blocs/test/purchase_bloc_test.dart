@@ -10,12 +10,9 @@ void main() {
   final nextWeek = event('e-1', startsIn: const Duration(days: 7));
   const eventId = EventId('e-1');
 
-  var ids = 0;
-  TicketId newId() => TicketId('n-${++ids}');
-
   PurchaseBloc build(FakeTicketing store) => PurchaseBloc(
     getPurchaseContext: GetPurchaseContext(events: store, tickets: store, clock: clock),
-    reserveTickets: ReserveTickets(events: store, tickets: store, clock: clock, newId: newId),
+    reserveTickets: ReserveTickets(events: store, tickets: store, clock: clock),
     visitor: ana,
   );
 
@@ -65,7 +62,7 @@ void main() {
     expect: () => [
       isA<PurchaseReady>()
           .having((s) => s.quantity, 'quantity', 5)
-          .having((s) => s.validation, 'validation', const InvalidTicketQuantity(5)),
+          .having((s) => s.validation, 'validation', const InvalidTicketQuantity(5, min: 1, max: 4)),
     ],
   );
 
@@ -81,7 +78,7 @@ void main() {
       isA<PurchaseReady>().having(
         (s) => s.validation,
         'validation',
-        const TicketLimitExceeded(alreadyHeld: 3, requested: 2),
+        const TicketLimitExceeded(alreadyHeld: 3, requested: 2, max: 4),
       ),
     ],
   );
@@ -121,13 +118,7 @@ void main() {
     act: (bloc) async {
       await start(bloc);
       final store = bloc.reserveTickets.tickets;
-      await store.saveAll([
-        ticket(
-          'm-1',
-          status: Paid(paidAt: now),
-          holder: marko,
-        ),
-      ]);
+      await store.reserve(eventId: eventId, by: marko, quantity: 1, now: now);
       bloc
         ..add(const PurchaseQuantityChanged(2))
         ..add(const PurchaseSubmitted());
@@ -138,6 +129,24 @@ void main() {
       isA<PurchaseReady>()
           .having((s) => s.submitting, 'submitting', isFalse)
           .having((s) => s.rejection, 'rejection', const NotEnoughSeats(1)),
+    ],
+  );
+
+  blocTest<PurchaseBloc, PurchaseState>(
+    'a rejection reloads the context and keeps the quantity, so the late client sees the fresh seats',
+    build: () => build(FakeTicketing(events: [event('e-1', startsIn: const Duration(days: 7), capacity: 1)])),
+    act: (bloc) async {
+      await start(bloc);
+      await bloc.reserveTickets.tickets.reserve(eventId: eventId, by: marko, quantity: 1, now: now);
+      bloc.add(const PurchaseSubmitted());
+    },
+    skip: 3,
+    expect: () => [
+      isA<PurchaseReady>()
+          .having((s) => s.context.remaining, 'remaining', 0)
+          .having((s) => s.quantity, 'quantity', 1)
+          .having((s) => s.submitting, 'submitting', isFalse)
+          .having((s) => s.rejection, 'rejection', const NotEnoughSeats(0)),
     ],
   );
 }

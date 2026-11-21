@@ -31,14 +31,70 @@ void main() {
     expect(events.map((e) => e.id), [const EventId('e-early'), const EventId('e-late')]);
   });
 
-  test('saveAll adds new tickets and replaces changed ones by id', () async {
+  const ana = User(id: UserId('u-ana'), name: 'u-ana', role: Role.visitor);
+
+  test('reserve stores new reservations with fresh ids', () async {
+    final store = InMemoryTicketing(events: [event('e-1', inDays: 3)]);
+
+    final result = await store.reserve(eventId: const EventId('e-1'), by: ana, quantity: 2, now: now);
+
+    final created = result.valueOrNull!;
+    expect(created.map((t) => t.id), [const TicketId('n-1'), const TicketId('n-2')]);
+    expect(created.map((t) => t.status), everyElement(Reserved(expiresAt: now.add(reservationHold))));
+    expect(await store.ticketsOf(ana.id), created);
+  });
+
+  test('reserve rejects more than the remaining seats and stores nothing', () async {
+    final store = InMemoryTicketing(
+      events: [event('e-1', inDays: 3)],
+      tickets: [for (var i = 1; i <= 9; i++) ticket('t-$i', holder: 'u-$i')],
+    );
+
+    final result = await store.reserve(eventId: const EventId('e-1'), by: ana, quantity: 2, now: now);
+
+    expect(result, const Failure<List<Ticket>>(NotEnoughSeats(1)));
+    expect(await store.ticketsOf(ana.id), isEmpty);
+  });
+
+  test('reserve of an unknown event is NotFound', () async {
+    final store = InMemoryTicketing();
+    final result = await store.reserve(eventId: const EventId('nope'), by: ana, quantity: 1, now: now);
+    expect(result, const Failure<List<Ticket>>(NotFound()));
+  });
+
+  test('save replaces a ticket whose stored status is still the one it was read in', () async {
     final store = InMemoryTicketing(tickets: [ticket('t-1')]);
     final paid = ticket('t-1').copyWith(status: Paid(paidAt: now));
-    await store.saveAll([paid, ticket('t-2', event: 'e-2', holder: 'u-marko')]);
 
+    final result = await store.save(paid, from: ticket('t-1').status);
+
+    expect(result, Success(paid));
     expect(await store.findTicket(const TicketId('t-1')), paid);
-    expect(await store.ticketsOf(const UserId('u-ana')), [paid]);
-    expect(await store.ticketsFor(const EventId('e-2')), [ticket('t-2', event: 'e-2', holder: 'u-marko')]);
-    expect(await store.findEvent(const EventId('e-1')), isNull);
+  });
+
+  test('save refuses when another call changed the status meanwhile', () async {
+    final paid = ticket('t-1').copyWith(status: Paid(paidAt: now));
+    final store = InMemoryTicketing(tickets: [paid]);
+    final cancelled = ticket('t-1').copyWith(
+      status: Cancelled(at: now, by: ana.id),
+    );
+
+    final result = await store.save(cancelled, from: ticket('t-1').status);
+
+    expect(result, Failure<Ticket>(InvalidTransition(from: paid.status, to: cancelled.status)));
+    expect(await store.findTicket(const TicketId('t-1')), paid);
+  });
+
+  test('remainingSeats counts the active tickets of the event', () async {
+    final store = InMemoryTicketing(
+      events: [event('e-1', inDays: 3)],
+      tickets: [
+        ticket('t-1'),
+        ticket('t-2'),
+        ticket('t-3', event: 'e-2'),
+      ],
+    );
+    expect(await store.remainingSeats(const EventId('e-1'), now: now), 8);
+    expect(await store.remainingSeats(const EventId('nope'), now: now), 0);
   });
 }

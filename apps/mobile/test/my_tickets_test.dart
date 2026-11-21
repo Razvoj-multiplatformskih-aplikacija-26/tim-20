@@ -14,13 +14,16 @@ void main() {
     await tester.pumpWidget(appWith(dependencies));
     await tester.pump(const Duration(seconds: 2));
 
-    dependencies.fake!.failingRequests = 1;
     await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Moje karte')));
-    await tester.pump();
+    await settle(tester);
+    expect(find.byType(StatusBadge), findsWidgets);
+
+    dependencies.fake!.failingRequests = 1;
+    await pullToRefresh(tester, find.byType(StatusBadge).first);
     expect(find.byType(LoadingView), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 2));
-    expect(find.text('Podaci trenutno nisu dostupni.'), findsOneWidget);
+    expect(find.text('Nema veze sa serverom.'), findsOneWidget);
 
     dependencies.fake!.emptyResponses = 1;
     await tester.tap(find.text('Pokušaj ponovo'));
@@ -118,6 +121,6 @@ void main() {
 
     expect(badge('Plaćena'), findsOneWidget);
     expect(find.text('Otkaži'), findsNothing);
-    expect(find.text(const CancellationTooLate().message), findsOneWidget);
+    expect(find.text(const CancellationTooLate(notice: cancellationNotice).message), findsOneWidget);
   });
 }

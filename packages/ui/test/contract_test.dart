@@ -9,8 +9,14 @@ void main() {
   });
 
   test('messages take the numbers from the rules', () {
-    expect(const TicketLimitExceeded(alreadyHeld: 3, requested: 2).message, contains('najviše $maxTicketsPerEvent'));
-    expect(const CancellationTooLate().message, contains('${cancellationNotice.inHours} sata'));
+    expect(
+      const TicketLimitExceeded(alreadyHeld: 3, requested: 2, max: maxTicketsPerEvent).message,
+      contains('najviše $maxTicketsPerEvent'),
+    );
+    expect(
+      const CancellationTooLate(notice: cancellationNotice).message,
+      contains('${cancellationNotice.inHours} sata'),
+    );
   });
 
   test('every status has a Serbian label', () {

@@ -9,14 +9,20 @@ void main() {
     });
 
     test('rejects 0 and 5 as an invalid quantity', () {
-      expect(TicketQuantity.parse(0, alreadyHeld: 0), const Failure<TicketQuantity>(InvalidTicketQuantity(0)));
-      expect(TicketQuantity.parse(5, alreadyHeld: 0), const Failure<TicketQuantity>(InvalidTicketQuantity(5)));
+      expect(
+        TicketQuantity.parse(0, alreadyHeld: 0),
+        const Failure<TicketQuantity>(InvalidTicketQuantity(0, min: 1, max: 4)),
+      );
+      expect(
+        TicketQuantity.parse(5, alreadyHeld: 0),
+        const Failure<TicketQuantity>(InvalidTicketQuantity(5, min: 1, max: 4)),
+      );
     });
 
     test('rejects a quantity that would exceed the limit together with held tickets', () {
       expect(
         TicketQuantity.parse(2, alreadyHeld: 3),
-        const Failure<TicketQuantity>(TicketLimitExceeded(alreadyHeld: 3, requested: 2)),
+        const Failure<TicketQuantity>(TicketLimitExceeded(alreadyHeld: 3, requested: 2, max: 4)),
       );
     });
 

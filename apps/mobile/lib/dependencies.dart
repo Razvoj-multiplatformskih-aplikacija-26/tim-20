@@ -1,4 +1,6 @@
+import 'package:api_client/api_client.dart';
 import 'package:domain/domain.dart';
+import 'package:use_cases/testing.dart';
 import 'package:use_cases/use_cases.dart';
 
 import 'data/fake_ticketing.dart';
@@ -8,35 +10,63 @@ import 'data/seed.dart';
 final class AppDependencies {
   AppDependencies({
     required this.clock,
-    required this.visitor,
     required EventRepository events,
     required TicketRepository tickets,
-    required TicketId Function() newId,
+    required SessionRepository sessions,
     this.fake,
-  }) : getUpcomingEvents = GetUpcomingEvents(events: events, tickets: tickets, clock: clock),
+  }) : getUpcomingEvents = GetUpcomingEvents(events: events, clock: clock),
        getMyTickets = GetMyTickets(events: events, tickets: tickets, clock: clock),
        getPurchaseContext = GetPurchaseContext(events: events, tickets: tickets, clock: clock),
-       reserveTickets = ReserveTickets(events: events, tickets: tickets, clock: clock, newId: newId),
-       payTicket = PayTicket(tickets: tickets, clock: clock),
-       cancelTicket = CancelTicket(events: events, tickets: tickets, clock: clock);
+       reserveTickets = ReserveTickets(events: events, tickets: tickets, clock: clock),
+       payTicket = PayTicket(events: events, tickets: tickets, clock: clock),
+       cancelTicket = CancelTicket(events: events, tickets: tickets, clock: clock),
+       logIn = LogIn(sessions: sessions),
+       restoreSession = RestoreSession(sessions: sessions),
+       logOut = LogOut(sessions: sessions),
+       sessionExpirations = sessions.expirations;
 
-  // KT2: AppDependencies.server(...) with an HTTP adapter for both ports.
+  /// The same ports over HTTP; the session token lives in [tokens], never in the app.
+  factory AppDependencies.server({
+    required Uri baseUri,
+    required TokenStore tokens,
+    Clock clock = const SystemClock(),
+  }) {
+    final api = ApiClient(baseUri: baseUri, tokens: tokens);
+    return AppDependencies(
+      clock: clock,
+      events: HttpEventRepository(api),
+      tickets: HttpTicketRepository(api),
+      sessions: HttpSessionRepository(api),
+    );
+  }
+
   factory AppDependencies.fake({
     Clock clock = const SystemClock(),
     Duration latency = const Duration(milliseconds: 700),
+    bool signedIn = true,
+    User user = ana,
   }) {
     final fake = FakeTicketing(clock: clock, latency: latency);
-    return AppDependencies(clock: clock, visitor: ana, events: fake, tickets: fake, newId: fake.newId, fake: fake);
+    return AppDependencies(
+      clock: clock,
+      events: fake,
+      tickets: fake,
+      sessions: InMemorySessions(user, signedIn: signedIn),
+      fake: fake,
+    );
   }
 
   final Clock clock;
-  final User visitor;
   final GetUpcomingEvents getUpcomingEvents;
   final GetMyTickets getMyTickets;
   final GetPurchaseContext getPurchaseContext;
   final ReserveTickets reserveTickets;
   final PayTicket payTicket;
   final CancelTicket cancelTicket;
+  final LogIn logIn;
+  final RestoreSession restoreSession;
+  final LogOut logOut;
+  final Stream<void> sessionExpirations;
 
   /// Only the debug menu uses it, to simulate an outage or an empty answer.
   final FakeTicketing? fake;

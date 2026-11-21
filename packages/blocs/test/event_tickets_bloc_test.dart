@@ -27,8 +27,8 @@ void main() {
     );
     return EventTicketsBloc(
       getEventTickets: GetEventTickets(events: store, tickets: store, clock: clock),
-      confirmPayment: ConfirmPayment(tickets: store, clock: clock),
-      admitTicket: AdmitTicket(tickets: store, clock: clock),
+      confirmPayment: ConfirmPayment(events: store, tickets: store, clock: clock),
+      admitTicket: AdmitTicket(events: store, tickets: store, clock: clock),
       voidTicket: VoidTicket(events: store, tickets: store, clock: clock),
       staff: organizer,
     );
@@ -68,6 +68,23 @@ void main() {
       build: build,
       act: (bloc) => bloc.add(const EventTicketsRequested(EventId('e-2'))),
       expect: () => [const EventTicketsLoading(), EventTicketsEmpty(event('e-2'))],
+    );
+
+    blocTest<EventTicketsBloc, EventTicketsState>(
+      'refreshing an empty event loads its first ticket',
+      build: build,
+      act: (bloc) async {
+        bloc.add(const EventTicketsRequested(EventId('e-2')));
+        await bloc.stream.firstWhere((state) => state is EventTicketsEmpty);
+        await store.reserve(eventId: const EventId('e-2'), by: ana, quantity: 1, now: now);
+        bloc.add(const EventTicketsRefreshed());
+      },
+      expect: () => [
+        const EventTicketsLoading(),
+        EventTicketsEmpty(event('e-2')),
+        const EventTicketsLoading(),
+        isA<EventTicketsLoaded>().having((state) => state.data.tickets.length, 'tickets', 1),
+      ],
     );
 
     blocTest<EventTicketsBloc, EventTicketsState>(
@@ -353,7 +370,10 @@ void main() {
       act: (bloc) async {
         await loaded(bloc, selectedId: paid.id);
         bloc.add(const TicketStatusFilterChanged(StatusFilter.paid));
-        await store.saveAll([reserved.copyWith(status: Paid(paidAt: now))]);
+        await store.save(
+          reserved.copyWith(status: Paid(paidAt: now)),
+          from: reserved.status,
+        );
         bloc.add(const EventTicketsRefreshed());
       },
       skip: 3,

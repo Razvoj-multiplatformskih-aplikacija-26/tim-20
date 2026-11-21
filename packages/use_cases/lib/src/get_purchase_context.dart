@@ -12,17 +12,16 @@ final class GetPurchaseContext {
   final TicketRepository tickets;
   final Clock clock;
 
-  /// Null for an unknown event.
+  /// Null for an unknown event. The visitor's own tickets give the limit; the seats come from the event repository.
   Future<PurchaseContext?> call({required EventId eventId, required UserId holder}) async {
     final event = await events.findEvent(eventId);
     if (event == null) return null;
 
     final now = clock.now();
-    final ticketsOfEvent = await tickets.ticketsFor(eventId);
     return PurchaseContext(
       event: event,
-      remaining: remainingSeats(event, ticketsOfEvent, now: now),
-      alreadyHeld: heldBy(holder, eventId, ticketsOfEvent, now: now),
+      remaining: await events.remainingSeats(eventId, now: now),
+      alreadyHeld: heldBy(holder, eventId, await tickets.ticketsOf(holder), now: now),
     );
   }
 }

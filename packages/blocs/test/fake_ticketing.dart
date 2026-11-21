@@ -75,8 +75,25 @@ final class FakeTicketing implements EventRepository, TicketRepository {
   }
 
   @override
-  Future<List<Ticket>> saveAll(List<Ticket> tickets) async {
+  Future<int> remainingSeats(EventId id, {required DateTime now}) async {
     _roundTrip();
-    return _store.saveAll(tickets);
+    return _store.remainingSeats(id, now: now);
+  }
+
+  @override
+  Future<Result<List<Ticket>>> reserve({
+    required EventId eventId,
+    required User by,
+    required int quantity,
+    required DateTime now,
+  }) async {
+    _roundTrip();
+    return _store.reserve(eventId: eventId, by: by, quantity: quantity, now: now);
+  }
+
+  @override
+  Future<Result<Ticket>> save(Ticket ticket, {required TicketStatus from}) async {
+    _roundTrip();
+    return _store.save(ticket, from: from);
   }
 }

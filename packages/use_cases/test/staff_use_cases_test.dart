@@ -8,6 +8,8 @@ void main() {
   final clock = FixedClock(now);
 
   const organizer = User(id: UserId('u-org'), name: 'Organizator', role: Role.organizer);
+  const otherOrganizer = User(id: UserId('u-other'), name: 'Drugi organizator', role: Role.organizer);
+  const usher = User(id: UserId('u-usher'), name: 'Redar', role: Role.usher);
   const ana = User(id: UserId('u-ana'), name: 'Ana Anić', role: Role.visitor);
 
   Event event(String id, {Duration startsIn = const Duration(days: 7), UserId organizerId = const UserId('u-org')}) =>
@@ -66,12 +68,26 @@ void main() {
       final getEventTickets = GetEventTickets(events: store, tickets: store, clock: clock);
       expect(await getEventTickets(eventId: const EventId('missing'), staff: organizer), isNull);
     });
+
+    test('returns null when an organizer requests another organizer\'s event', () async {
+      final store = InMemoryTicketing(events: [event('e-1', organizerId: otherOrganizer.id)]);
+      final getEventTickets = GetEventTickets(events: store, tickets: store, clock: clock);
+
+      expect(await getEventTickets(eventId: const EventId('e-1'), staff: organizer), isNull);
+    });
+
+    test('an usher may list another organizer\'s event', () async {
+      final store = InMemoryTicketing(events: [event('e-1', organizerId: otherOrganizer.id)]);
+      final getEventTickets = GetEventTickets(events: store, tickets: store, clock: clock);
+
+      expect(await getEventTickets(eventId: const EventId('e-1'), staff: usher), isNotNull);
+    });
   });
 
   group('ConfirmPayment', () {
     test('saves the paid ticket', () async {
       final store = InMemoryTicketing(events: [event('e-1')], tickets: [ticket('t-1')]);
-      final confirm = ConfirmPayment(tickets: store, clock: clock);
+      final confirm = ConfirmPayment(events: store, tickets: store, clock: clock);
 
       final result = await confirm(id: const TicketId('t-1'), by: organizer);
 
@@ -81,8 +97,14 @@ void main() {
 
     test('returns NotFound for an unknown id', () async {
       final store = InMemoryTicketing();
-      final confirm = ConfirmPayment(tickets: store, clock: clock);
+      final confirm = ConfirmPayment(events: store, tickets: store, clock: clock);
       expect(await confirm(id: const TicketId('missing'), by: organizer), const Failure<Ticket>(NotFound()));
+    });
+
+    test('a visitor may see their own ticket but not confirm its payment', () async {
+      final store = InMemoryTicketing(events: [event('e-1')], tickets: [ticket('t-1')]);
+      final confirm = ConfirmPayment(events: store, tickets: store, clock: clock);
+      expect(await confirm(id: const TicketId('t-1'), by: ana), const Failure<Ticket>(NotAllowed()));
     });
   });
 
@@ -91,13 +113,45 @@ void main() {
       events: [event('e-1')],
       tickets: [ticket('t-1', status: Paid(paidAt: now))],
     );
-    final admit = AdmitTicket(tickets: store, clock: clock);
+    final admit = AdmitTicket(events: store, tickets: store, clock: clock);
 
     final first = await admit(id: const TicketId('t-1'), by: organizer);
     final second = await admit(id: const TicketId('t-1'), by: organizer);
 
     expect(first.valueOrNull?.status, Used(scannedAt: now, scannedBy: organizer.id));
     expect(second, const Failure<Ticket>(TicketAlreadyUsed()));
+  });
+
+  test('an organizer cannot admit a ticket for another event, but an usher can', () async {
+    final store = InMemoryTicketing(
+      events: [event('e-1', organizerId: otherOrganizer.id)],
+      tickets: [ticket('t-1', status: Paid(paidAt: now))],
+    );
+    final admit = AdmitTicket(events: store, tickets: store, clock: clock);
+
+    expect(await admit(id: const TicketId('t-1'), by: organizer), const Failure<Ticket>(NotFound()));
+    expect(await admit(id: const TicketId('t-1'), by: usher), isA<Success<Ticket>>());
+  });
+
+  test('AdmitTicket that loses the race to another admission reads again and reports TicketAlreadyUsed', () async {
+    final events = InMemoryTicketing(
+      events: [event('e-1')],
+      tickets: [ticket('t-1', status: Paid(paidAt: now))],
+    );
+    final store = RacingTicketing(
+      events,
+      meanwhile: (ticket) => ticket.copyWith(
+        status: Used(scannedAt: now, scannedBy: usher.id),
+      ),
+    );
+
+    final result = await AdmitTicket(events: events, tickets: store, clock: clock)(
+      id: const TicketId('t-1'),
+      by: organizer,
+    );
+
+    expect(result, const Failure<Ticket>(TicketAlreadyUsed()));
+    expect((await store.findTicket(const TicketId('t-1')))?.status, Used(scannedAt: now, scannedBy: usher.id));
   });
 
   group('VoidTicket', () {
@@ -138,4 +192,51 @@ void main() {
 
     expect(events.map((e) => e.id), [const EventId('e-early'), const EventId('e-late')]);
   });
+
+  test('GetOrganizerEvents shows an usher every event', () async {
+    final store = InMemoryTicketing(
+      events: [
+        event('e-1'),
+        event('e-other', organizerId: const UserId('u-other')),
+      ],
+    );
+    final events = await GetOrganizerEvents(events: store)(usher);
+    expect(events.map((e) => e.id), containsAll([const EventId('e-1'), const EventId('e-other')]));
+  });
+}
+
+/// Lets another call change the ticket between the read and the first save, as a second client would.
+final class RacingTicketing implements TicketRepository {
+  RacingTicketing(this._store, {required this.meanwhile});
+
+  final InMemoryTicketing _store;
+  final Ticket Function(Ticket stored) meanwhile;
+  var _raced = false;
+
+  @override
+  Future<Result<Ticket>> save(Ticket ticket, {required TicketStatus from}) async {
+    if (!_raced) {
+      _raced = true;
+      final stored = (await _store.findTicket(ticket.id))!;
+      await _store.save(meanwhile(stored), from: stored.status);
+    }
+    return _store.save(ticket, from: from);
+  }
+
+  @override
+  Future<Ticket?> findTicket(TicketId id) => _store.findTicket(id);
+
+  @override
+  Future<List<Ticket>> ticketsFor(EventId eventId) => _store.ticketsFor(eventId);
+
+  @override
+  Future<List<Ticket>> ticketsOf(UserId holderId) => _store.ticketsOf(holderId);
+
+  @override
+  Future<Result<List<Ticket>>> reserve({
+    required EventId eventId,
+    required User by,
+    required int quantity,
+    required DateTime now,
+  }) => _store.reserve(eventId: eventId, by: by, quantity: quantity, now: now);
 }

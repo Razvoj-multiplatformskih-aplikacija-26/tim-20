@@ -20,9 +20,8 @@ void main() {
 
   MyTicketsBloc build(FakeTicketing store) => MyTicketsBloc(
     getMyTickets: GetMyTickets(events: store, tickets: store, clock: clock),
-    payTicket: PayTicket(tickets: store, clock: clock),
+    payTicket: PayTicket(events: store, tickets: store, clock: clock),
     cancelTicket: CancelTicket(events: store, tickets: store, clock: clock),
-    visitor: ana,
     clock: clock,
   );
 
@@ -30,15 +29,63 @@ void main() {
 
   /// Actions make sense only once the list is on screen, so the tests wait for it like a visitor would.
   Future<void> load(MyTicketsBloc bloc) async {
-    bloc.add(const MyTicketsRequested());
+    bloc.add(const MyTicketsVisitorChanged(ana));
     await bloc.stream.firstWhere((s) => s is MyTicketsLoaded);
   }
+
+  group('session', () {
+    test('starts signed out', () {
+      expect(build(store()).state, const MyTicketsSignedOut());
+    });
+
+    blocTest<MyTicketsBloc, MyTicketsState>(
+      'a request without a visitor changes nothing',
+      build: () => build(store()),
+      act: (bloc) => bloc.add(const MyTicketsRequested()),
+      expect: () => <MyTicketsState>[],
+    );
+
+    blocTest<MyTicketsBloc, MyTicketsState>(
+      'a visitor signing in loads their tickets',
+      build: () => build(store()),
+      act: (bloc) => bloc.add(const MyTicketsVisitorChanged(ana)),
+      expect: () => [const MyTicketsLoading(), isA<MyTicketsLoaded>()],
+    );
+
+    blocTest<MyTicketsBloc, MyTicketsState>(
+      'a visitor signing out clears the tickets',
+      build: () => build(store()),
+      act: (bloc) async {
+        await load(bloc);
+        bloc.add(const MyTicketsVisitorChanged(null));
+      },
+      skip: 2,
+      expect: () => [const MyTicketsSignedOut()],
+    );
+
+    blocTest<MyTicketsBloc, MyTicketsState>(
+      'the answer for a visitor who signed out in the meantime is dropped',
+      build: () => build(store()),
+      act: (bloc) async {
+        await load(bloc);
+        bloc
+          ..add(const TicketPaymentRequested(TicketId('t-1')))
+          ..add(const MyTicketsVisitorChanged(null));
+      },
+      skip: 2,
+      expect: () => [isA<MyTicketsLoaded>().having((s) => s.isBusy, 'busy', isTrue), const MyTicketsSignedOut()],
+    );
+  });
 
   group('four states', () {
     blocTest<MyTicketsBloc, MyTicketsState>(
       'requested emits loading, then the tickets sorted by event start',
       build: () => build(store()),
-      act: (bloc) => bloc.add(const MyTicketsRequested()),
+      act: (bloc) async {
+        await load(bloc);
+        bloc.add(const MyTicketsRequested());
+      },
+      skip: 2,
       expect: () => [
         const MyTicketsLoading(),
         isA<MyTicketsLoaded>().having((s) => s.tickets.map((t) => t.ticket.id.value), 'ids', ['t-3', 't-1', 't-2']),
@@ -48,7 +95,7 @@ void main() {
     blocTest<MyTicketsBloc, MyTicketsState>(
       'requested on an outage emits failure',
       build: () => build(store()..failingRequests = 1),
-      act: (bloc) => bloc.add(const MyTicketsRequested()),
+      act: (bloc) => bloc.add(const MyTicketsVisitorChanged(ana)),
       expect: () => [
         const MyTicketsLoading(),
         isA<MyTicketsFailure>().having((s) => s.cause, 'cause', isA<RepositoryException>()),
@@ -58,7 +105,7 @@ void main() {
     blocTest<MyTicketsBloc, MyTicketsState>(
       'a visitor without tickets gets empty',
       build: () => build(FakeTicketing(events: [nextWeek])),
-      act: (bloc) => bloc.add(const MyTicketsRequested()),
+      act: (bloc) => bloc.add(const MyTicketsVisitorChanged(ana)),
       expect: () => [const MyTicketsLoading(), const MyTicketsEmpty()],
     );
   });
@@ -112,7 +159,11 @@ void main() {
     skip: 3,
     expect: () => [
       isA<MyTicketsLoaded>()
-          .having((s) => s.notice, 'notice', const TicketActionRejected(CancellationTooLate()))
+          .having(
+            (s) => s.notice,
+            'notice',
+            const TicketActionRejected(CancellationTooLate(notice: Duration(hours: 24))),
+          )
           .having((s) => s.byId(const TicketId('t-3'))?.ticket.status, 'status', Paid(paidAt: now))
           .having((s) => s.inFlightId, 'inFlight', isNull),
     ],
@@ -162,9 +213,25 @@ void main() {
   blocTest<MyTicketsBloc, MyTicketsState>(
     'the loaded state remembers when the tickets were read',
     build: () => build(store()),
-    act: (bloc) => bloc.add(const MyTicketsRequested()),
+    act: (bloc) => bloc.add(const MyTicketsVisitorChanged(ana)),
     skip: 1,
     expect: () => [isA<MyTicketsLoaded>().having((s) => s.loadedAt, 'loadedAt', now)],
+  );
+
+  blocTest<MyTicketsBloc, MyTicketsState>(
+    'a rejected action reloads the tickets and then shows the reason, so a late client sees fresh data',
+    build: () => build(store()),
+    act: (bloc) async {
+      await load(bloc);
+      await bloc.cancelTicket.tickets.reserve(eventId: nextWeek.id, by: ana, quantity: 1, now: now);
+      bloc.add(const TicketCancellationRequested(TicketId('t-3')));
+    },
+    skip: 3,
+    expect: () => [
+      isA<MyTicketsLoaded>()
+          .having((s) => s.tickets, 'tickets', hasLength(4))
+          .having((s) => s.notice, 'notice', isA<TicketActionRejected>()),
+    ],
   );
 
   blocTest<MyTicketsBloc, MyTicketsState>(

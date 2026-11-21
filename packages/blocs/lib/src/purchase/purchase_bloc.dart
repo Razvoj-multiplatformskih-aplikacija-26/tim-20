@@ -30,10 +30,11 @@ final class PurchaseBloc extends Bloc<PurchaseEvent, PurchaseState> {
   final User visitor;
 
   /// The form is checked with the rule from the domain; the screen only shows the message.
-  PurchaseReady _ready(PurchaseContext context, int quantity) => PurchaseReady(
+  PurchaseReady _ready(PurchaseContext context, int quantity, {DomainError? rejection}) => PurchaseReady(
     context: context,
     quantity: quantity,
     validation: TicketQuantity.parse(quantity, alreadyHeld: context.alreadyHeld).errorOrNull,
+    rejection: rejection,
   );
 
   Future<void> _onSubmitted(PurchaseSubmitted event, Emitter<PurchaseState> emit) async {
@@ -51,7 +52,17 @@ final class PurchaseBloc extends Bloc<PurchaseEvent, PurchaseState> {
       case Success(:final value):
         emit(PurchaseCompleted(value));
       case Failure(:final error):
-        emit(current.copyWith(submitting: false, rejection: error));
+        await _reloadAfter(error, current, emit);
+    }
+  }
+
+  /// The server decided over fresher data than the form, so the form shows the fresh seats with the reason.
+  Future<void> _reloadAfter(DomainError error, PurchaseReady current, Emitter<PurchaseState> emit) async {
+    try {
+      final context = await getPurchaseContext(eventId: current.context.event.id, holder: visitor.id);
+      emit(context == null ? const PurchaseNotFound() : _ready(context, current.quantity, rejection: error));
+    } on Exception {
+      emit(current.copyWith(submitting: false, rejection: error));
     }
   }
 }

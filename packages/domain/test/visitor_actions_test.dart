@@ -69,7 +69,7 @@ void main() {
           reserveTickets(event: event(), ticketsOfEvent: held, by: ana, quantity: quantity, now: now, newId: newId);
 
       expect(reserve(1), isA<Success<List<Ticket>>>());
-      expect(reserve(2), const Failure<List<Ticket>>(TicketLimitExceeded(alreadyHeld: 3, requested: 2)));
+      expect(reserve(2), const Failure<List<Ticket>>(TicketLimitExceeded(alreadyHeld: 3, requested: 2, max: 4)));
     });
 
     test('rejects more tickets than there are seats left', () {
@@ -154,7 +154,7 @@ void main() {
         by: ana,
         now: now,
       );
-      expect(result, const Failure<Ticket>(CancellationTooLate()));
+      expect(result, const Failure<Ticket>(CancellationTooLate(notice: Duration(hours: 24))));
     });
 
     test('lets the organizer cancel one hour before the start, with a reason', () {

@@ -73,10 +73,12 @@ final class EventTicketsBloc extends Bloc<EventTicketsEvent, EventTicketsState> 
     }
   }
 
-  // Reloads without passing through loading, so the table keeps its filter, selection and cursor.
+  // A loaded table refreshes in place; an empty event uses the full load when its first ticket appears.
   Future<void> _refresh(Emitter<EventTicketsState> emit) async {
     final eventId = _eventId;
-    if (state is! EventTicketsLoaded || eventId == null) return;
+    if (eventId == null) return;
+    if (state is EventTicketsEmpty) return _load(emit, eventId);
+    if (state is! EventTicketsLoaded) return;
     final request = ++_request;
     try {
       final data = await getEventTickets(eventId: eventId, staff: staff);

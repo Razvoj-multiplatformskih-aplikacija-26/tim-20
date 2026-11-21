@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-// D3: final look. Stubs until then.
+import '../text/failures.dart';
+
 class LoadingView extends StatelessWidget {
   const LoadingView({super.key});
 
@@ -13,9 +14,13 @@ class LoadingView extends StatelessWidget {
 }
 
 class FailureView extends StatelessWidget {
-  const FailureView({super.key, required this.onRetry});
+  const FailureView({super.key, required this.onRetry, this.cause, this.secondaryAction});
 
   final VoidCallback onRetry;
+
+  /// What stopped the data, so the screen can say that the server is down instead of a generic text.
+  final Object? cause;
+  final Widget? secondaryAction;
 
   @override
   Widget build(BuildContext context) {
@@ -25,10 +30,13 @@ class FailureView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'Podaci trenutno nisu dostupni.',
-              style: Theme.of(context).textTheme.titleLarge,
-              textAlign: TextAlign.center,
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                failureMessage(cause),
+                style: Theme.of(context).textTheme.titleLarge,
+                textAlign: TextAlign.center,
+              ),
             ),
             const SizedBox(height: 16),
             FilledButton.tonalIcon(
@@ -36,6 +44,7 @@ class FailureView extends StatelessWidget {
               icon: const Icon(Icons.refresh),
               label: const Text('Pokušaj ponovo'),
             ),
+            if (secondaryAction case final action?) ...[const SizedBox(height: 8), action],
           ],
         ),
       ),

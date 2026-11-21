@@ -12,10 +12,10 @@ final class GetEventTickets {
   final TicketRepository tickets;
   final Clock clock;
 
-  /// Null for an unknown event.
+  /// Null for an unknown event or one the staff member cannot list.
   Future<EventTickets?> call({required EventId eventId, required User staff}) async {
     final event = await events.findEvent(eventId);
-    if (event == null) return null;
+    if (event == null || !AccessPolicy.canListEvent(staff, event)) return null;
     final now = clock.now();
     final shown = [
       for (final ticket in await tickets.ticketsFor(eventId))
