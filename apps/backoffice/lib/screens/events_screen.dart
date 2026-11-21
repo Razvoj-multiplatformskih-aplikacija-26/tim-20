@@ -39,7 +39,10 @@ class EventsScreen extends StatelessWidget {
       body: BlocBuilder<OrganizerEventsBloc, OrganizerEventsState>(
         builder: (context, state) => switch (state) {
           OrganizerEventsLoading() => const LoadingView(),
-          OrganizerEventsFailure() => FailureView(onRetry: () => bloc.add(const OrganizerEventsRequested())),
+          OrganizerEventsFailure(:final cause) => FailureView(
+            cause: cause,
+            onRetry: () => bloc.add(const OrganizerEventsRequested()),
+          ),
           OrganizerEventsEmpty() => const EmptyView(
             title: 'Nemate nijedan događaj.',
             message: 'Događaji se u ovoj verziji unose unapred.',

@@ -42,13 +42,44 @@ final class _ExpiringSessions implements SessionRepository {
   Stream<void> get expirations => _expirations.stream;
 }
 
-BackofficeDependencies dependenciesWith({SessionRepository? sessions}) {
+/// Delegates to the fake box office, except that saving a ticket runs [onSave] instead.
+final class _TicketsWithSave implements TicketRepository {
+  _TicketsWithSave(this._inner, this.onSave);
+
+  final FakeBoxOffice _inner;
+  final Future<Result<Ticket>> Function(Ticket ticket, TicketStatus from) onSave;
+
+  @override
+  Future<List<Ticket>> ticketsOf(UserId holderId) => _inner.ticketsOf(holderId);
+
+  @override
+  Future<List<Ticket>> ticketsFor(EventId eventId) => _inner.ticketsFor(eventId);
+
+  @override
+  Future<Ticket?> findTicket(TicketId id) => _inner.findTicket(id);
+
+  @override
+  Future<Result<List<Ticket>>> reserve({
+    required EventId eventId,
+    required User by,
+    required int quantity,
+    required DateTime now,
+  }) => _inner.reserve(eventId: eventId, by: by, quantity: quantity, now: now);
+
+  @override
+  Future<Result<Ticket>> save(Ticket ticket, {required TicketStatus from}) => onSave(ticket, from);
+}
+
+BackofficeDependencies dependenciesWith({
+  SessionRepository? sessions,
+  Future<Result<Ticket>> Function(FakeBoxOffice fake, Ticket ticket, TicketStatus from)? onSave,
+}) {
   final clock = FixedClock(sundayEvening);
   final fake = FakeBoxOffice(clock: clock, latency: Duration.zero);
   return BackofficeDependencies(
     clock: clock,
     events: fake,
-    tickets: fake,
+    tickets: onSave == null ? fake : _TicketsWithSave(fake, (ticket, from) => onSave(fake, ticket, from)),
     sessions: sessions ?? InMemorySessions(organizer),
     fake: fake,
   );
@@ -142,6 +173,17 @@ void main() {
     expect(find.text('Prijava je istekla. Prijavite se ponovo.'), findsOneWidget);
   });
 
+  testWidgets("the server down shows 'Nema veze sa serverom.' and 'Pokušaj ponovo'", (tester) async {
+    final dependencies = fakeDependencies()..fake!.failingRequests = 1;
+    await pumpBackoffice(tester, dependencies: dependencies);
+    await settle(tester);
+
+    expect(find.text('Nema veze sa serverom.'), findsOneWidget);
+    await tester.tap(find.text('Pokušaj ponovo'));
+    await settle(tester);
+    expect(find.text('Brucošijada'), findsOneWidget);
+  });
+
   testWidgets('the usher can only admit a paid ticket', (tester) async {
     await openTicket(tester, 'T20-t-01', dependencies: fakeDependencies(staff: usher));
     expect(inPanel('Rezervisana'), findsOneWidget);
@@ -153,5 +195,44 @@ void main() {
     expect(inPanel('Pusti na ulaz'), findsOneWidget);
     expect(inPanel('Potvrdi plaćanje'), findsNothing);
     expect(inPanel('Poništi'), findsNothing);
+  });
+
+  testWidgets(
+    "an action refused by a newer server shows 'Server nije prihvatio zahtev.' and an unreachable server 'Nema veze sa serverom.'",
+    (tester) async {
+      var failure = RepositoryFailure.refused;
+      final dependencies = dependenciesWith(
+        onSave: (_, _, _) async => throw RepositoryException('Refused', failure: failure),
+      );
+      await openTicket(tester, 'T20-t-07', dependencies: dependencies);
+
+      await tester.tap(inPanel('Pusti na ulaz'));
+      await settle(tester);
+      expect(find.text('Server nije prihvatio zahtev.'), findsOneWidget);
+
+      failure = RepositoryFailure.unreachable;
+      ScaffoldMessenger.of(tester.element(find.byType(TicketTable))).removeCurrentSnackBar();
+      await tester.tap(inPanel('Pusti na ulaz'));
+      await settle(tester);
+      expect(find.text('Nema veze sa serverom.'), findsOneWidget);
+    },
+  );
+
+  testWidgets('a rejected action shows the reason and the reloaded table', (tester) async {
+    final dependencies = dependenciesWith(
+      onSave: (fake, ticket, from) async {
+        await fake.save(ticket, from: from);
+        return fake.save(ticket, from: from);
+      },
+    );
+    await openTicket(tester, 'T20-t-07', dependencies: dependencies);
+    expect(inPanel('Plaćena'), findsOneWidget);
+
+    await tester.tap(inPanel('Pusti na ulaz'));
+    await settle(tester);
+
+    expect(find.text('Karta je već iskorišćena.'), findsOneWidget);
+    expect(inPanel('Iskorišćena'), findsOneWidget);
+    expect(inPanel('Pusti na ulaz'), findsNothing);
   });
 }

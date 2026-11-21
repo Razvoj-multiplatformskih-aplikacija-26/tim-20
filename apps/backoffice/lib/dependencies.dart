@@ -1,3 +1,4 @@
+import 'package:api_client/api_client.dart';
 import 'package:domain/domain.dart';
 import 'package:use_cases/testing.dart';
 import 'package:use_cases/use_cases.dart';
@@ -22,6 +23,21 @@ final class BackofficeDependencies {
        restoreSession = RestoreSession(sessions: sessions),
        logOut = LogOut(sessions: sessions),
        sessionExpirations = sessions.expirations;
+
+  /// The same ports over HTTP. In the browser the session lives in a cookie, elsewhere in [tokens].
+  factory BackofficeDependencies.server({
+    required Uri baseUri,
+    required TokenStore tokens,
+    Clock clock = const SystemClock(),
+  }) {
+    final api = ApiClient(baseUri: baseUri, tokens: tokens);
+    return BackofficeDependencies(
+      clock: clock,
+      events: HttpEventRepository(api),
+      tickets: HttpTicketRepository(api),
+      sessions: HttpSessionRepository(api),
+    );
+  }
 
   factory BackofficeDependencies.fake({
     Clock clock = const SystemClock(),
