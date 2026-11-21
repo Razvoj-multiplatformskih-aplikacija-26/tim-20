@@ -173,6 +173,30 @@ void main() {
     expect(find.text('Prijava je istekla. Prijavite se ponovo.'), findsOneWidget);
   });
 
+  testWidgets('a refresh in the browser keeps the address after the session is restored', (tester) async {
+    useWindow(tester, width: 1200, height: 800);
+    await pumpBackoffice(tester, location: '/dogadjaji/e-a?selected=t-01');
+    tester.binding.platformDispatcher.defaultRouteNameTestValue = '/';
+    await settle(tester);
+
+    expect(currentLocation(tester), '/dogadjaji/e-a?selected=t-01');
+    expect(find.descendant(of: find.byType(TicketDetailPanel), matching: find.text('T20-t-01')), findsOneWidget);
+  });
+
+  testWidgets('the next user after a logout starts from the event list', (tester) async {
+    useWindow(tester, width: 1200, height: 800);
+    await pumpBackoffice(tester, location: '/dogadjaji/e-a');
+    await settle(tester);
+    await tester.tap(find.byType(BackButton));
+    await settle(tester);
+    await tester.tap(find.byTooltip('Odjavi se'));
+    await settle(tester);
+
+    await signIn(tester, 'organizator');
+
+    expect(currentLocation(tester), '/');
+  });
+
   testWidgets("the server down shows 'Nema veze sa serverom.' and 'Pokušaj ponovo'", (tester) async {
     final dependencies = fakeDependencies()..fake!.failingRequests = 1;
     await pumpBackoffice(tester, dependencies: dependencies);

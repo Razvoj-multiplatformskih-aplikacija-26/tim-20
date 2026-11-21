@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'screens/event_tickets_screen.dart';
 import 'screens/events_screen.dart';
 
-GoRouter createRouter() {
+GoRouter createRouter({required String initialLocation}) {
   return GoRouter(
+    initialLocation: initialLocation,
+    overridePlatformDefaultLocation: true,
     routes: [
       GoRoute(path: '/', builder: (_, _) => const EventsScreen()),
       GoRoute(

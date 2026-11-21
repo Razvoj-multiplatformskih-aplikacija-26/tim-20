@@ -27,6 +27,16 @@ class _BackofficeAppState extends State<BackofficeApp> {
     expirations: widget.dependencies.sessionExpirations,
   )..add(const SessionRestoreRequested());
 
+  /// The address the app was opened at, read before the first screen: the browser resets it to '/' as soon as a
+  /// navigator starts, so a refresh while signed in would otherwise lose the event and the selected ticket.
+  late String _startLocation;
+
+  @override
+  void initState() {
+    super.initState();
+    _startLocation = WidgetsBinding.instance.platformDispatcher.defaultRouteName;
+  }
+
   @override
   void dispose() {
     _session.close();
@@ -40,7 +50,9 @@ class _BackofficeAppState extends State<BackofficeApp> {
       value: dependencies,
       child: BlocProvider.value(
         value: _session,
-        child: BlocBuilder<SessionBloc, SessionState>(
+        child: BlocConsumer<SessionBloc, SessionState>(
+          listenWhen: (previous, current) => previous is SignedIn && current is! SignedIn,
+          listener: (context, session) => _startLocation = '/',
           builder: (context, session) => switch (session) {
             SessionUnknown() => _material(
               key: const ValueKey('session-unknown'),
@@ -56,7 +68,12 @@ class _BackofficeAppState extends State<BackofficeApp> {
                 onSignedIn: (user) => _session.add(SessionStarted(user)),
               ),
             ),
-            SignedIn(:final user) => _SignedInApp(key: ValueKey(user.id), staff: user, dependencies: dependencies),
+            SignedIn(:final user) => _SignedInApp(
+              key: ValueKey(user.id),
+              staff: user,
+              dependencies: dependencies,
+              initialLocation: _startLocation,
+            ),
           },
         ),
       ),
@@ -66,17 +83,18 @@ class _BackofficeAppState extends State<BackofficeApp> {
 
 /// A new router and a new list of events for every signed-in user, so nothing of the previous one stays on screen.
 class _SignedInApp extends StatefulWidget {
-  const _SignedInApp({super.key, required this.staff, required this.dependencies});
+  const _SignedInApp({super.key, required this.staff, required this.dependencies, required this.initialLocation});
 
   final User staff;
   final BackofficeDependencies dependencies;
+  final String initialLocation;
 
   @override
   State<_SignedInApp> createState() => _SignedInAppState();
 }
 
 class _SignedInAppState extends State<_SignedInApp> {
-  late final GoRouter _router = createRouter();
+  late final GoRouter _router = createRouter(initialLocation: widget.initialLocation);
 
   @override
   void dispose() {
@@ -98,7 +116,7 @@ class _SignedInAppState extends State<_SignedInApp> {
   }
 }
 
-/// Before sign-in the address of the page is kept for the router, so the app does not try to open it as a route.
+/// Before sign-in the app does not try to open the address of the page as a route; the router opens it later.
 Widget _material({Key? key, Widget? home, GoRouter? router}) {
   if (router != null) {
     return MaterialApp.router(
